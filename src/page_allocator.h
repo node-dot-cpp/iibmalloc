@@ -236,7 +236,7 @@ constexpr size_t single_page_cache_size = 4;
 constexpr size_t multi_page_cache_size = 2;
 
 
-struct FreeChunks
+struct PageAllocator
 {
 //	Chunk* topChunk = nullptr;
 	std::array<MemoryBlockList, max_cached_size+1> freeBlocks;

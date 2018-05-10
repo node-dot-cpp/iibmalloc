@@ -231,12 +231,55 @@ struct BlockStats
 	}
 };
 
+struct PageAllocator // rather a proof of concept
+{
+	BlockStats stats;
+	uint8_t blockSizeExp = 0;
+
+public:
+
+	void initialize(uint8_t blockSizeExp)
+	{
+		this->blockSizeExp = blockSizeExp;
+	}
+
+	MemoryBlockListItem* getFreeBlock(size_t sz)
+	{
+		assert(isAlignedExp(sz, blockSizeExp));
+		void* ptr = VirtualMemory::allocate(sz);
+		stats.allocate(sz);
+		if (ptr)
+		{
+			MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(ptr);
+			chk->initialize(sz, 0);
+			return chk;
+		}
+		//todo enlarge top chunk
+
+		throw std::bad_alloc();
+	}
+
+
+	void freeChunk( MemoryBlockListItem* chk )
+	{
+		size_t ix = chk->getSizeIndex();
+		assert ( ix == 0 );
+		stats.deallocate(chk->getSize());
+		VirtualMemory::deallocate(chk, chk->getSize());
+	}
+
+	void printStats()
+	{
+		stats.printStats();
+	}
+};
+
+
 constexpr size_t max_cached_size = 256; // # of pages
 constexpr size_t single_page_cache_size = 4;
 constexpr size_t multi_page_cache_size = 2;
 
-
-struct PageAllocator
+struct PageAllocatorWithCaching // to be further developed for practical purposes
 {
 //	Chunk* topChunk = nullptr;
 	std::array<MemoryBlockList, max_cached_size+1> freeBlocks;

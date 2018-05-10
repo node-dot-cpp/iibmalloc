@@ -58,15 +58,21 @@ public:
 //	static void release(void* addr);
 };
 
-struct ListItem
+struct MemoryBlockListItem
 {
-	ListItem* next;
-	ListItem* prev;
+	MemoryBlockListItem* next;
+	MemoryBlockListItem* prev;
+	typedef size_t SizeT; //todo
+//	static constexpr SizeT INUSE_FLAG = 1;
+	SizeT size;
+	uint8_t sizeIndex;
 
-	void listInitializeNull()
+	void initialize(SizeT sz, uint8_t szIndex)
 	{
-		next = nullptr;
+		size = sz;
 		prev = nullptr;
+		next = nullptr;
+		sizeIndex = szIndex;
 	}
 
 	void listInitializeEmpty()
@@ -74,8 +80,10 @@ struct ListItem
 		next = this;
 		prev = this;
 	}
+	uint8_t getSizeIndex() const { return sizeIndex; }
+	SizeT getSize() const {	return size; }
 
-	void listInsertNext(ListItem* other)
+	void listInsertNext(MemoryBlockListItem* other)
 	{
 		assert(isInList());
 		assert(!other->isInList());
@@ -86,13 +94,12 @@ struct ListItem
 		next = other;
 	}
 
-	ListItem* listGetNext()
+	MemoryBlockListItem* listGetNext()
 	{
 		return next;
 	}
-
 	
-	ListItem* listGetPrev()
+	MemoryBlockListItem* listGetPrev()
 	{
 		return prev;
 	}
@@ -124,91 +131,15 @@ struct ListItem
 
 };
 
-struct Chunk :public ListItem
-{
-	typedef size_t SizeT; //todo
-//	static constexpr SizeT INUSE_FLAG = 1;
-	SizeT size;
-	//SizeT sizeBefore;
-	uint8_t sizeIndex;
 
-	//TODO consider merging all in a single byte
-	uint8_t inUse;
-//	uint8_t last;
-
-	enum BucketKinds :uint8_t
-	{
-		Free = 0,
-		NoBucket,
-		SmallBucket,
-		MediumBucket
-	} bucketKind;
-
-
-	void initialize(SizeT sz, uint8_t szIndex)
-	{
-		size = sz;
-		prev = nullptr;
-		next = nullptr;
-		sizeIndex = szIndex;
-		bucketKind = Free;
-	}
-
-	SizeT getSize() const
-	{
-		return size;
-	}
-
-	void setSize(SizeT sz, uint8_t szIx) 
-	{
-		size = sz;
-		sizeIndex = szIx;
-	}
-
-	bool isFree() const {return bucketKind == Free;}
-	void setFree() { bucketKind = Free;}
-	void setInUse() { bucketKind = NoBucket;}
-
-
-	BucketKinds getBucketKind() const { return bucketKind; }
-	void setBucketKind(BucketKinds kind) { bucketKind = kind; }
-
-	//bool noFlags() const { return isFree() && getBucketKind() == NoBucket; }
-	//void clearFlags() { clearInUse(); setBucketKind(NoBucket); }
-
-	uint8_t getSizeIndex() const { return sizeIndex; }
-
-	//void updateAfterSize(size_t sz)
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + sz;
-	//	reinterpret_cast<Chunk*>(ptr)->setSizeBefore(sz);
-	//}
-	
-
-	
-	//Chunk* getBefore()
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) - sizeBefore;
-	//	return sizeBefore != 0 ? reinterpret_cast<Chunk*>(ptr) : nullptr;
-	//}
-
-	//Chunk* getAfter()
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + getSize();
-	//	return reinterpret_cast<Chunk*>(ptr);
-	//}
-
-};
-
-
-class ChunkList
+class MemoryBlockList
 {
 private:
 	uint32_t count = 0;
-	ListItem lst;
+	MemoryBlockListItem lst;
 public:
 	
-	ChunkList()
+	MemoryBlockList()
 	{
 		lst.listInitializeEmpty();
 	}
@@ -218,28 +149,28 @@ public:
 	FORCE_INLINE
 		uint32_t size() const { return count; }
 	FORCE_INLINE
-		bool isEnd(ListItem* item) const { return item == &lst; }
+		bool isEnd(MemoryBlockListItem* item) const { return item == &lst; }
 
 	FORCE_INLINE
-	ListItem* front()
+	MemoryBlockListItem* front()
 
 	{
 		return lst.listGetNext();
 	}
 
 	FORCE_INLINE
-	void pushFront(ListItem* chk)
+	void pushFront(MemoryBlockListItem* chk)
 	{
 		lst.listInsertNext(chk);
 		++count;
 	}
 
 	FORCE_INLINE
-	ListItem* popFront()
+	MemoryBlockListItem* popFront()
 	{
 		assert(!empty());
 
-		ListItem* chk = lst.listGetNext();
+		MemoryBlockListItem* chk = lst.listGetNext();
 		chk->removeFromList();
 		--count;
 
@@ -247,11 +178,11 @@ public:
 	}
 
 	FORCE_INLINE
-		ListItem* popBack()
+		MemoryBlockListItem* popBack()
 	{
 		assert(!empty());
 
-		ListItem* chk = lst.listGetPrev();
+		MemoryBlockListItem* chk = lst.listGetPrev();
 		chk->removeFromList();
 		--count;
 
@@ -259,7 +190,7 @@ public:
 	}
 
 	FORCE_INLINE
-	void remove(ListItem* chk)
+	void remove(MemoryBlockListItem* chk)
 	{
 		chk->removeFromList();
 		--count;
@@ -308,7 +239,7 @@ constexpr size_t multi_page_cache_size = 2;
 struct FreeChunks
 {
 //	Chunk* topChunk = nullptr;
-	std::array<ChunkList, max_cached_size+1> freeBlocks;
+	std::array<MemoryBlockList, max_cached_size+1> freeBlocks;
 
 	BlockStats stats;
 	//uintptr_t blocksBegin = 0;
@@ -323,7 +254,7 @@ public:
 		this->blockSizeExp = blockSizeExp;
 	}
 
-	Chunk* getFreeBlock(size_t sz)
+	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
 		assert(isAlignedExp(sz, blockSizeExp));
 
@@ -332,7 +263,7 @@ public:
 		{
 			if (!freeBlocks[ix].empty())
 			{
-				Chunk* chk = static_cast<Chunk*>(freeBlocks[ix].popFront());
+				MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(freeBlocks[ix].popFront());
 				chk->initialize(sz, ix);
 //				assert(chk->isFree());
 //				chk->setInUse();
@@ -344,7 +275,7 @@ public:
 		stats.allocate(sz);
 		if (ptr)
 		{
-			Chunk* chk = static_cast<Chunk*>(ptr);
+			MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(ptr);
 			chk->initialize(sz, ix);
 			return chk;
 		}
@@ -354,24 +285,24 @@ public:
 	}
 
 
-	void freeChunk(Chunk* chk)
+	void freeChunk( MemoryBlockListItem* chk )
 	{
-		assert(!chk->isFree());
-		assert(!chk->isInList());
+//		assert(!chk->isFree());
+//		assert(!chk->isInList());
 
 		size_t ix = chk->getSizeIndex();
 		if ( ix == 0 ) // quite likely case (all bucket chunks)
 		{
 			if ( freeBlocks[ix].getCount() < single_page_cache_size )
 			{
-				chk->setFree();
+//				chk->setFree();
 				freeBlocks[ix].pushFront(chk);
 				return;
 			}
 		}
 		else if ( ix < max_cached_size && freeBlocks[ix].getCount() < multi_page_cache_size )
 		{
-			chk->setFree();
+//			chk->setFree();
 			freeBlocks[ix].pushFront(chk);
 			return;
 		}

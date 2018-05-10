@@ -60,6 +60,60 @@ static union
 } SerializableAllocatorMagic;
 
 
+struct Chunk :public MemoryBlockListItem
+{
+	//TODO consider merging all in a single byte
+	uint8_t inUse;
+//	uint8_t last;
+
+	enum BucketKinds :uint8_t
+	{
+		Free = 0,
+		NoBucket,
+		SmallBucket,
+		MediumBucket
+	} bucketKind;
+
+
+	void initialize()
+	{
+		bucketKind = Free;
+	}
+
+	bool isFree() const {return bucketKind == Free;}
+	void setFree() { bucketKind = Free;}
+	void setInUse() { bucketKind = NoBucket;}
+
+
+	BucketKinds getBucketKind() const { return bucketKind; }
+	void setBucketKind(BucketKinds kind) { bucketKind = kind; }
+
+	//bool noFlags() const { return isFree() && getBucketKind() == NoBucket; }
+	//void clearFlags() { clearInUse(); setBucketKind(NoBucket); }
+
+
+	//void updateAfterSize(size_t sz)
+	//{
+	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + sz;
+	//	reinterpret_cast<Chunk*>(ptr)->setSizeBefore(sz);
+	//}
+	
+
+	
+	//Chunk* getBefore()
+	//{
+	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) - sizeBefore;
+	//	return sizeBefore != 0 ? reinterpret_cast<Chunk*>(ptr) : nullptr;
+	//}
+
+	//Chunk* getAfter()
+	//{
+	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + getSize();
+	//	return reinterpret_cast<Chunk*>(ptr);
+	//}
+
+};
+
 
 struct BucketBlockV2 : Chunk
 {
@@ -397,9 +451,9 @@ public:
 
 struct UsedBlockLists
 {
-	ChunkList partials;
-	ChunkList fulls;
-	ChunkList emptys;
+	MemoryBlockList partials;
+	MemoryBlockList fulls;
+	MemoryBlockList emptys;
 };
 
 
@@ -422,7 +476,7 @@ struct HeapManager
 	std::array<void*, 32> userPtrs;
 
 	std::array<UsedBlockLists, BS::ArrSize> bucketBlocks;
-	ChunkList usedNonBuckets;
+	MemoryBlockList usedNonBuckets;
 	BS bs;
 
 	bool delayedDeallocate = false;
@@ -471,7 +525,7 @@ struct HeapManager
 	template<class BUCKET>
 	NOINLINE void* allocate3WhenNoChunkReady(UsedBlockLists& bl, uint8_t index)
 	{
-		Chunk* chk = freeChunks.getFreeBlock(blockSize);//alloc bucket;
+		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(blockSize) );//alloc bucket;
 
 		BUCKET* bb = makeBucketBlock<BUCKET>(chk, index);
 
@@ -528,7 +582,7 @@ struct HeapManager
 	NOINLINE void* allocate2ForLargeSize(size_t sz)
 	{
 		size_t chkSz = alignUpExp(sz + CHUNK_OVERHEAD, blockSizeExp);
-		Chunk* chk = freeChunks.getFreeBlock(chkSz);//alloc bucket;
+		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(chkSz) );//alloc bucket;
 		chk->setBucketKind(Chunk::NoBucket);
 
 		usedNonBuckets.pushFront(chk);

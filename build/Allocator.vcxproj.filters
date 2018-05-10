@@ -20,6 +20,12 @@
     <ClInclude Include="..\src\test_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\page_allocator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\bucket_allocator_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\bucket_allocator_windows.cpp">

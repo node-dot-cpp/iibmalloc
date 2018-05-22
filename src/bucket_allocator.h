@@ -45,6 +45,7 @@
 
 #include "bucket_allocator_common.h"
 #include "page_allocator.h"
+#include "page_allocator_with_map.h"
 
 
 
@@ -493,18 +494,16 @@ struct HeapManager
 	}
 
 
-	void initialize()
+	void initialize(uint8_t pageSizeExp)
 	{
-		//begin = reinterpret_cast<uintptr_t>(ptr);
-		//end = begin + sz;
-		//reservedSize = sz;
-		blockSize = BLOCK_SIZE;
-		blockSizeExp = BLOCK_SIZE_EXP;
-		blockSizeMask = BLOCK_SIZE_MASK;
+		blockSize = expToSize(pageSizeExp);
+		blockSizeExp = pageSizeExp;
+		blockSizeMask = expToMask(pageSizeExp);
 
-		freeChunks.initialize(blockSizeExp);
+		freeChunks.initialize(pageSizeExp);
 		bs.initializeBucketOffsets(blockSize, firstBucketAlignmentExp);
 	}
+
 
 	
 	template<class BUCKET>
@@ -742,7 +741,7 @@ struct HeapManager
 };
 
 //typedef BigBlockBase<BucketSizes, ChunkSizes> BigBlock;
-typedef HeapManager<BucketSizes2, PageAllocatorWithCaching> Heap;
+typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorHashMap> Heap;
 //typedef BigBlockBase<BucketSizes2, ChunkSizes> BigBlock;
 
 class SerializableAllocatorBase
@@ -831,7 +830,7 @@ public:
 
 
 		heap = new(ptr) Heap();
-		heap->initialize();
+		heap->initialize(pageSizeExp);
 	}
 
 	~SerializableAllocatorBase()

@@ -26,6 +26,9 @@
     <ClInclude Include="..\src\bucket_allocator_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\page_allocator_with_map.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\bucket_allocator_windows.cpp">
@@ -37,6 +40,8 @@
     <ClCompile Include="..\src\test_common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\page_allocator_windows.cpp" />
+    <ClCompile Include="..\src\page_allocator_windows.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

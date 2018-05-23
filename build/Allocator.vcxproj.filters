@@ -37,6 +37,8 @@
     <ClCompile Include="..\src\test_common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\page_allocator_windows.cpp" />
+    <ClCompile Include="..\src\page_allocator_windows.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

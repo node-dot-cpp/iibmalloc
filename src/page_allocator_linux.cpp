@@ -49,7 +49,7 @@ thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
 
 // limit below is single read or write op in linux
 static constexpr size_t MAX_LINUX = 0x7ffff000;
-static_assert(MAX_LINUX <= MAX_CHUNK_SIZE, "Use of big chunks needs review.");
+// [DI: what depends on what/] static_assert(MAX_LINUX <= MAX_CHUNK_SIZE, "Use of big chunks needs review.");
 
 /*static*/
 size_t VirtualMemory::getPageSize()

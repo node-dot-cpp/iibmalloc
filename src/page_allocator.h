@@ -41,6 +41,16 @@
 
 #include "bucket_allocator_common.h"
 
+#define GET_PERF_DATA
+
+#ifdef GET_PERF_DATA
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
+#endif // GET_PERF_DATA
+
 
 /* OS specific implementations */
 class VirtualMemory

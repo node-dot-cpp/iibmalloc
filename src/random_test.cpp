@@ -305,7 +305,7 @@ void randomPos_FixedSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxIte
 
 
 NOINLINE
-void randomTestUsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
+void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
 {
 	const size_t SIZE = 1024 * 1024 * 1024;
 //	g_AllocManager.initialize(  ((size_t)1) << ( 1 + maxItemsExp + maxItemSizeExp ) );
@@ -316,91 +316,141 @@ void randomTestUsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp,
 	size_t itemIdxMask = maxItems - 1;
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
 
-	uint8_t** baseBuff = reinterpret_cast<uint8_t**>( g_AllocManager.allocate( maxItems * sizeof(uint8_t*) ) );
-	memset( baseBuff, 0, maxItems * sizeof( uint8_t* ) );
+	size_t dummyCtr = 0;
+
+	struct TestBin
+	{
+		uint8_t* ptr;
+		size_t sz;
+	};
+
+	TestBin* baseBuff = reinterpret_cast<TestBin*>( g_AllocManager.allocate( maxItems * sizeof(TestBin) ) );
+	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
 		size_t idx = randNum & itemIdxMask;
-		if ( baseBuff[idx] )
+		if ( baseBuff[idx].ptr )
 		{
-			g_AllocManager.deallocate( baseBuff[idx] );
-			baseBuff[idx] = 0;
+			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
+				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
+			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
+				dummyCtr += baseBuff[idx].ptr[i];
+			g_AllocManager.deallocate( baseBuff[idx].ptr );
+			baseBuff[idx].ptr = 0;
 		}
 		else
 		{
 			randNum >>= maxItemsExp; // let's be economical with randomicity!
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
-			baseBuff[idx] = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
+			baseBuff[idx].sz = sz;
+			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
 		}
 	}
 	for ( size_t idx=0; idx<maxItems; ++idx )
-		if ( baseBuff[idx] )
-			g_AllocManager.deallocate( baseBuff[idx] );
+		if ( baseBuff[idx].ptr )
+		{
+			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
+				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
+			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
+				dummyCtr += baseBuff[idx].ptr[i];
+			g_AllocManager.deallocate( baseBuff[idx].ptr );
+		}
 
 	g_AllocManager.deallocate( baseBuff );
 	g_AllocManager.printStats();
 	g_AllocManager.disable();
 		
-	printf( "about to exit thread %zd (%zd operations performed)...\n", threadID, iterCount );
+	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
 
 NOINLINE
-void randomTestUsingNewAndDeleteExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
+void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
 {
 	size_t maxItems = ((size_t)1) << maxItemsExp;
 	size_t itemIdxMask = maxItems - 1;
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
-	uint8_t** baseBuff = new uint8_t* [maxItems];
-	memset( baseBuff, 0, maxItems * sizeof( uint8_t* ) );
+
+	size_t dummyCtr = 0;
+
+	struct TestBin
+	{
+		uint8_t* ptr;
+		size_t sz;
+	};
+	TestBin* baseBuff = new TestBin [maxItems];
+	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
+
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
 		size_t idx = randNum & itemIdxMask;
-		if ( baseBuff[idx] )
+		if ( baseBuff[idx].ptr )
 		{
-			delete [] baseBuff[idx];
-			baseBuff[idx] = 0;
+			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
+				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
+			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
+				dummyCtr += baseBuff[idx].ptr[i];
+			delete [] baseBuff[idx].ptr;
+			baseBuff[idx].ptr = 0;
 		}
 		else
 		{
 			randNum >>= maxItemsExp; // let's be economical with randomicity!
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
-			baseBuff[idx] = new uint8_t[ sz ];
+			baseBuff[idx].sz = sz;
+			baseBuff[idx].ptr = new uint8_t[ sz ];
 		}
 	}
 	for ( size_t idx=0; idx<maxItems; ++idx )
-		if ( baseBuff[idx] )
-			delete [] baseBuff[idx];
+		if ( baseBuff[idx].ptr )
+		{
+			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
+				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
+			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
+				dummyCtr += baseBuff[idx].ptr[i];
+			delete [] baseBuff[idx].ptr;
+		}
 	delete [] baseBuff;
-	printf( "about to exit thread %zd (%zd operations performed)...\n", threadID, iterCount );
+	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
 
 NOINLINE
-void randomTestEmptyExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
+void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID )
 {
 	size_t maxItems = ((size_t)1) << maxItemsExp;
 	size_t itemIdxMask = maxItems - 1;
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
-	uint8_t** baseBuff = new uint8_t* [maxItems];
-	memset( baseBuff, 0, maxItems * sizeof( uint8_t* ) );
+	struct TestBin
+	{
+		uint8_t* ptr;
+		size_t sz;
+	};
+	TestBin* baseBuff = new TestBin [maxItems];
+	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
+	size_t dummyCtr = 0;
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
 		size_t idx = randNum & itemIdxMask;
-		if ( baseBuff[idx] )
+		if ( baseBuff[idx].ptr )
 		{
-			baseBuff[idx] = 0;
+			baseBuff[idx].ptr = 0;
+			dummyCtr += baseBuff[idx].sz;
 		}
 		else
 		{
 			randNum >>= maxItemsExp; // let's be economical with randomicity!
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
-			baseBuff[idx] = reinterpret_cast<uint8_t*>(sz);
+			baseBuff[idx].sz = sz;
+			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>(sz+1);
 		}
 	}
+	for ( size_t idx=0; idx<maxItems; ++idx )
+		if ( baseBuff[idx].ptr )
+			dummyCtr += baseBuff[idx].sz;
 	delete [] baseBuff;
-	printf( "about to exit thread %zd (%zd operations performed)...\n", threadID, iterCount );
+	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
 
 
@@ -1477,7 +1527,7 @@ void randomTest_FrequentAndInfrequentWithAccess_SkewedBinSelection_RandomUnitSiz
 
 
 enum { USE_PER_THREAD_ALLOCATOR, USE_NEW_DELETE, USE_EMPTY_TEST };
-enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
+enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
 	USE_FREQUENTANDINFREQUENT_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENT_SKEWEDBINSELECTION_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_SKEWEDBINSELECTION_RANDOMUNITSIZE };
 
 struct TestStartupParams
@@ -1541,21 +1591,21 @@ void* runRandomTest( void* params )
 			}
 			break;
 		}
-		case USE_RANDOMPOS_RANDOMSIZE:
+		case USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:
 		{
 			switch ( testParams->usePerThreadAllocator )
 			{
 				case USE_PER_THREAD_ALLOCATOR:
-					printf( "    running thread %zd with randomTestUsingPerThreadAllocator() ...\n", testParams->threadID );
-					randomTestUsingPerThreadAllocatorExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocator() ...\n", testParams->threadID );
+					randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
 					break;
 				case USE_NEW_DELETE:
-					printf( "    running thread %zd with randomTestUsingNewAndDelete() ...\n", testParams->threadID );
-					randomTestUsingNewAndDeleteExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDelete() ...\n", testParams->threadID );
+					randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
 					break;
 				case USE_EMPTY_TEST:
-					printf( "    running thread %zd with randomTestEmpty() ...\n", testParams->threadID );
-					randomTestEmptyExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_Empty() ...\n", testParams->threadID );
+					randomPos_RandomSizeSize_FullMemAccess_EmptyExp( testParams->iterCount, testParams->maxItems, testParams->maxItemSize, testParams->threadID );
 					break;
 				default:
 					assert( false );
@@ -1723,6 +1773,11 @@ void doTest( size_t testThreadCount, TestStartupParams* startupParams )
 	}
 }
 
+struct TestUnitRes
+{
+	size_t innerDur;
+};
+
 struct TestRes
 {
 	size_t threadCount;
@@ -1768,27 +1823,55 @@ extern size_t decommitCtr;
 extern size_t commitSz;
 extern size_t decommitSz;
 extern size_t maxAllocated;
+
+/*#include <x86intrin.h>
+inline unsigned long long getRdtsc(void)
+{
+#ifdef _MSC_VER
+	return __rdtsc();
+#else
+#if defined(__i386__)
+    unsigned long long tick;
+    __asm__ __volatile__("rdtsc" : "=A"(tick));
+    return tick;
+#elif defined(__x86_64__)
+    unsigned int tickl, tickh;
+    __asm__ __volatile__("rdtsc" : "=a"(tickl), "=d"(tickh));
+    return ((unsigned long long)tickh << 32)|tickl;
+#else
+#error "getting rdtsc is yet to be impleneted for this platform"
+#endif
+#endif
+}*/
+
+
 int main()
 {
 	TestRes testRes[max_threads];
+/*	uint64_t val1 = __builtin_ia32_rdtsc();
+	uint64_t val2 = getRdtsc();
+	printf( "timediff = %zd\n", val2-val1 );
+	uint64_t val3 = __rdtsc();
+	printf( "timediff = %zd\n", val3-val2 );
+	return 0;*/
 
-	if( 0 )
+	if( 1 )
 	{
 		TestStartupParams params;
-		params.iterCount = 100000000;
+		params.iterCount = 1000000000;
 		params.maxItemSize = 8;
-		params.maxItems = 10;
+		params.maxItems = 20;
 		params.maxItemSize2 = 16;
 		params.maxItems2 = 16;
 		params.memReadCnt = 0;
-		params.calcMod = USE_RANDOMPOS_RANDOMSIZE;
+		params.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
 
-		size_t threadCountMax = 3;
+		size_t threadCountMax = 23;
 
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			runComparisonTest( threadCount, params, testRes[threadCount] );
 
-		printf( "Test summary for USE_RANDOMPOS_RANDOMSIZE:\n" );
+		printf( "Test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			printf( "%zd,%zd,%zd,%zd,%f\n", testRes[threadCount].threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
 	}
@@ -1856,10 +1939,10 @@ int main()
 			printf( "%zd,%zd,%zd,%zd,%f\n", testRes[threadCount].threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
 	}
 
-	if( 1 )
+	if( 0 )
 	{
 		TestStartupParams params;
-		params.iterCount = 1000000;
+		params.iterCount = 1000;
 		params.maxItemSize = 18;
 		params.maxItems = 10;
 		params.maxItemSize2 = 12;
@@ -1880,15 +1963,15 @@ int main()
 	if( 0 )
 	{
 		TestStartupParams params;
-		params.iterCount = 1000000;
-		params.maxItemSize = 18;
-		params.maxItems = 10;
+		params.iterCount = 100000000;
+		params.maxItemSize = 8;
+		params.maxItems = 20;
 		params.maxItemSize2 = 12;
 		params.maxItems2 = 16;
 		params.memReadCnt = 16;
 		params.calcMod = USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE;
 
-		size_t threadCountMax = 1;
+		size_t threadCountMax = 23;
 
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			runComparisonTest( threadCount, params, testRes[threadCount] );

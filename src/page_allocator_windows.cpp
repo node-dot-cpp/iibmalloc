@@ -165,4 +165,3 @@ void VirtualMemory::deallocate(void* ptr, size_t size)
 	decommitSz += size;
 	++decommitCtr;
 }
-

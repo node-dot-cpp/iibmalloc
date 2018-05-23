@@ -580,12 +580,15 @@ struct HeapManager
 
 	NOINLINE void* allocate2ForLargeSize(size_t sz)
 	{
-		size_t chkSz = alignUpExp(sz + CHUNK_OVERHEAD, blockSizeExp);
+//		constexpr size_t overhead = alignUpExp(sizeof(Chunk), FIRST_BUCKET_ALIGNMENT_EXP);
+		constexpr size_t overhead = alignUpExp(CM::CHUNK_OVERHEAD, FIRST_BUCKET_ALIGNMENT_EXP);
+
+		size_t chkSz = alignUpExp(sz + overhead, blockSizeExp);
 		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(chkSz) );//alloc bucket;
 		chk->setBucketKind(Chunk::NoBucket);
 
 		usedNonBuckets.pushFront(chk);
-		return reinterpret_cast<uint8_t*>(chk) + CHUNK_OVERHEAD;
+		return reinterpret_cast<uint8_t*>(chk) + overhead;
 	}
 
 	FORCE_INLINE void* allocate2(size_t sz)

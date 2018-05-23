@@ -512,6 +512,7 @@ struct PageAllocatorWithDescriptorMap // to be further developed for practical p
 	size_t blockSize = 0;
 
 public:
+	static constexpr size_t CHUNK_OVERHEAD = 0;
 
 	PageAllocatorWithDescriptorMap() {}
 
@@ -720,6 +721,7 @@ struct PageAllocatorWithDescriptorHashMap // to be further developed for practic
 	size_t blockSize = 0;
 
 public:
+	static constexpr size_t CHUNK_OVERHEAD = 0;
 
 	PageAllocatorWithDescriptorHashMap() { }
 

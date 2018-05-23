@@ -237,7 +237,6 @@ struct PageAllocator // rather a proof of concept
 	uint8_t blockSizeExp = 0;
 
 public:
-	static constexpr size_t CHUNK_OVERHEAD = sizeof(MemoryBlockListItem);
 
 	void initialize(uint8_t blockSizeExp)
 	{
@@ -292,7 +291,6 @@ struct PageAllocatorWithCaching // to be further developed for practical purpose
 	uint8_t blockSizeExp = 0;
 
 public:
-	static constexpr size_t CHUNK_OVERHEAD = sizeof(MemoryBlockListItem);
 
 	void initialize(uint8_t blockSizeExp)
 	{

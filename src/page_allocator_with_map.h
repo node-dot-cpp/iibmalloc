@@ -374,7 +374,7 @@ struct SimplifiedBucketAllocator
 	{
 		if (emptys.getCount() == 0)
 		{
-			void* chk = alloc->getMapFreeBlock(blockSize);//alloc bucket;
+			void* chk = alloc->getFreeBlock(blockSize);//alloc bucket;
 
 			BucketBlock* bb = static_cast<BucketBlock*>(chk);
 
@@ -386,7 +386,7 @@ struct SimplifiedBucketAllocator
 		else if (emptys.getCount() > 3)
 		{
 			BucketBlock* bb = static_cast<BucketBlock*>(emptys.popFront());
-			alloc->freeMapChunk(bb);
+			alloc->freeChunk(bb);
 		}
 	}
 };
@@ -512,7 +512,6 @@ struct PageAllocatorWithDescriptorMap // to be further developed for practical p
 	size_t blockSize = 0;
 
 public:
-	static constexpr size_t CHUNK_OVERHEAD = 0;
 
 	PageAllocatorWithDescriptorMap() {}
 
@@ -526,7 +525,6 @@ public:
 		void* ptr = VirtualMemory::allocate(blockSize);
 		descriptors.initialize(ptr, blockSizeExp);
 		descriptors.insert(ptr, blockSize);
-		descriptors.doHouseKeeping(this);
 	}
 
 	FORCE_INLINE
@@ -537,9 +535,8 @@ public:
 	}
 
 
-		template<bool DO_HK>
-		FORCE_INLINE
-			void* getFreeBlockInt(size_t sz)
+	FORCE_INLINE
+	void* getFreeBlock(size_t sz)
 	{
 
 		size_t ix = sizeToIndex(sz);
@@ -556,16 +553,23 @@ public:
 		stats.allocate(sz);
 		assert(ptr);
 		descriptors.insert(ptr, sz);
-		if(DO_HK)
-			descriptors.doHouseKeeping(this);
 
 		return ptr;
 	}
 
-
-	template<bool DO_HK = true>
 	FORCE_INLINE
-		void freeChunkInt( void* ptr )
+		MemoryBlockListItem* getBucketBlock(size_t sz)
+	{
+		//returns a block with alignment requirements to make buckets
+		void* ptr = getFreeBlock(sz);
+		MemoryBlockListItem* item = new(ptr) MemoryBlockListItem();
+		item->initialize(0, 0);
+
+		return item;
+	}
+
+	FORCE_INLINE
+		void freeChunk( void* ptr )
 	{
 		assert(isAlignedExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
 
@@ -589,32 +593,13 @@ public:
 
 		stats.deallocate(sz);
 		descriptors.erase(d);
-		if(DO_HK)
-			descriptors.doHouseKeeping(this);
 		
 		VirtualMemory::deallocate(ptr, sz);
 	}
 
-	void* getFreeBlock(size_t sz)
+	void doHouseKeeping()
 	{
-		return getFreeBlockInt<true>(sz);
-	}
-
-	void freeChunk(void* ptr)
-	{
-		freeChunkInt<true>(ptr);
-	}
-
-	//to be used by map, avoid recursion
-	void* getMapFreeBlock(size_t sz)
-	{
-		return getFreeBlockInt<false>(sz);
-	}
-
-	//to be used by map, avoid recursion
-	void freeMapChunk(void* ptr)
-	{
-		freeChunkInt<false>(ptr);
+		descriptors.doHouseKeeping(this);
 	}
 
 	void printStats()
@@ -721,7 +706,6 @@ struct PageAllocatorWithDescriptorHashMap // to be further developed for practic
 	size_t blockSize = 0;
 
 public:
-	static constexpr size_t CHUNK_OVERHEAD = 0;
 
 	PageAllocatorWithDescriptorHashMap() { }
 
@@ -735,7 +719,6 @@ public:
 		void* ptr = VirtualMemory::allocate(blockSize);
 		descriptors.initialize(ptr, blockSizeExp);
 		descriptors.insertNew(ptr, blockSize);
-		descriptors.doHouseKeeping(this);
 	}
 
 	FORCE_INLINE
@@ -746,9 +729,8 @@ public:
 	}
 
 
-	template<bool DO_HK>
 	FORCE_INLINE
-		void* getFreeBlockInt(size_t sz)
+	void* getFreeBlock(size_t sz)
 	{
 
 		size_t ix = sizeToIndex(sz);
@@ -766,16 +748,23 @@ public:
 		stats.allocate(sz);
 		assert(ptr);
 		descriptors.insertNew(ptr, sz);
-		if (DO_HK)
-			descriptors.doHouseKeeping(this);
 
 		return ptr;
 	}
 
-
-	template<bool DO_HK = true>
 	FORCE_INLINE
-		void freeChunkInt(void* ptr)
+		MemoryBlockListItem* getBucketBlock(size_t sz)
+	{
+		//returns a block with alignment requirements to make buckets
+		void* ptr = getFreeBlock(sz);
+		MemoryBlockListItem* item = new(ptr) MemoryBlockListItem();
+		item->initialize(0, 0);
+
+		return item;
+	}
+
+	FORCE_INLINE
+		void freeChunk(void* ptr)
 	{
 		assert(isAlignedExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
 
@@ -799,32 +788,13 @@ public:
 
 		stats.deallocate(sz);
 		descriptors.deallocate(d);
-		if (DO_HK)
-			descriptors.doHouseKeeping(this);
 
 		VirtualMemory::deallocate(ptr, sz);
 	}
 
-	void* getFreeBlock(size_t sz)
+	void doHouseKeeping()
 	{
-		return getFreeBlockInt<true>(sz);
-	}
-
-	void freeChunk(void* ptr)
-	{
-		freeChunkInt<true>(ptr);
-	}
-
-	//to be used by map, avoid recursion
-	void* getMapFreeBlock(size_t sz)
-	{
-		return getFreeBlockInt<false>(sz);
-	}
-
-	//to be used by map, avoid recursion
-	void freeMapChunk(void* ptr)
-	{
-		freeChunkInt<false>(ptr);
+		descriptors.doHouseKeeping(this);
 	}
 
 	void printStats()

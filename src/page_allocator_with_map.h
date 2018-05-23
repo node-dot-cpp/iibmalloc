@@ -633,7 +633,7 @@ struct PageDescriptorMap2
 		buckets.initialize(ptr, blockSizeExp);
 	}
 
-	size_t toHashBucket(void* ptr)
+	size_t getHash(void* ptr)
 	{
 		size_t u = reinterpret_cast<size_t>(ptr);
 		u >>= blockSizeExp;
@@ -644,7 +644,7 @@ struct PageDescriptorMap2
 
 	void insertNew(void* ptr, size_t sz)
 	{
-		size_t h = toHashBucket(ptr);
+		size_t h = getHash(ptr);
 
 		void* bkt = buckets.allocate();
 		PageDescriptor* pd = new(bkt) PageDescriptor(ptr, sz);
@@ -654,14 +654,14 @@ struct PageDescriptorMap2
 
 	void insert(PageDescriptor* pd)
 	{
-		size_t h = toHashBucket(pd->toPtr());
+		size_t h = getHash(pd->toPtr());
 
 		hashMap[h].pushFront(pd);
 	}
 
 	PageDescriptor* getDescriptor(void* ptr)
 	{
-		size_t h = toHashBucket(ptr);
+		size_t h = getHash(ptr);
 		assert(!hashMap[h].empty());
 
 		ListItem* current = hashMap[h].front();

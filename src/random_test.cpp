@@ -388,6 +388,7 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 	g_AllocManager.disable();
 
 	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->rdtscTotal = __rdtsc() - rdtscStart;
 	testRes->innerDur = GetMillisecondCount() - start;
 		
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
@@ -468,6 +469,7 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCou
 	delete [] baseBuff;
 
 	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->rdtscTotal = __rdtsc() - rdtscStart;
 	testRes->innerDur = GetMillisecondCount() - start;
 
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
@@ -534,6 +536,7 @@ void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t m
 	delete [] baseBuff;
 
 	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->rdtscTotal = __rdtsc() - rdtscStart;
 	testRes->innerDur = GetMillisecondCount() - start;
 
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
@@ -1675,7 +1678,7 @@ void* runRandomTest( void* params )
 					break;
 				case USE_EMPTY_TEST:
 					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_Empty() ...\n", testParams->threadID );
-					randomPos_RandomSizeSize_FullMemAccess_EmptyExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResPerThreadAlloc );
+					randomPos_RandomSizeSize_FullMemAccess_EmptyExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResEmpty );
 					break;
 				default:
 					assert( false );
@@ -1825,7 +1828,7 @@ void doTest( TestStartupParamsAndResults* startupParams )
 	for ( size_t i=0; i<testThreadCount; ++i )
 	{
 		memcpy( testParams + i, startupParams, sizeof(TestStartupParams) );
-		testParams[i].threadID = i + 1;
+		testParams[i].threadID = i;
 		testParams[i].threadResEmpty = startupParams->testRes->threadResEmpty + i;
 		testParams[i].threadResNewDel = startupParams->testRes->threadResNewDel + i;
 		testParams[i].threadResPerThreadAlloc = startupParams->testRes->threadResPerThreadAlloc + i;
@@ -1944,18 +1947,21 @@ int main()
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 		{
 			TestRes& tr = testRes[threadCount];
-			printf( "%zd,%zd,%zd,%zd,%f\n", params.startupParams.threadCount, tr.durEmpty, tr.durNewDel, tr.durPerThreadAlloc, (tr.durNewDel - tr.durEmpty) * 1. / (tr.durPerThreadAlloc - tr.durEmpty) );
+			printf( "%zd,%zd,%zd,%zd,%f\n", threadCount, tr.durEmpty, tr.durNewDel, tr.durPerThreadAlloc, (tr.durNewDel - tr.durEmpty) * 1. / (tr.durPerThreadAlloc - tr.durEmpty) );
 			printf( "Per-thread stats:\n" );
 			for ( size_t i=1;i<=threadCount;++i )
 			{
-				printf( "%d:\n", i );
-				ThreadTestRes& ttrEmpty = tr.threadResEmpty[i];
+				printf( "   %d:\n", i );
+				printThreadStats( "   ", tr.threadResEmpty[i] );
+				printThreadStats( "   ", tr.threadResPerThreadAlloc[i] );
+				printThreadStats( "   ", tr.threadResNewDel[i] );
 			}
 		}
+		printf( "\n" );
 
 		printf( "Short test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
-			printf( "%zd,%zd,%zd,%zd,%f\n", params.startupParams.threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
+			printf( "%zd,%zd,%zd,%zd,%f\n", threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
 	}
 
 	if( 0 )

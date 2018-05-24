@@ -163,6 +163,12 @@ struct ThreadTestRes
 	uint64_t rdtscSysDeallocCallSumAfterExit;
 };
 
+void printThreadStats( const char* prefix, ThreadTestRes& res )
+{
+//	printf( "%s%d: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, res.rdtscTotal, res.rdtscSetup, res.rdtscMainLoop, res.rdtscExit );
+	printf( "%s%d: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, res.rdtscTotal, res.rdtscSetup * .1 / res.rdtscTotal, res.rdtscMainLoop * .1 / res.rdtscTotal, res.rdtscExit * .1 / res.rdtscTotal );
+}
+
 struct TestRes
 {
 	size_t durEmpty;

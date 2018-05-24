@@ -307,6 +307,10 @@ void randomPos_FixedSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxIte
 NOINLINE
 void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
+	testRes->threadID = threadID; // just as received
+	size_t start = GetMillisecondCount();
+	uint64_t rdtscStart = __rdtsc();
+
 	const size_t SIZE = 1024 * 1024 * 1024;
 //	g_AllocManager.initialize(  ((size_t)1) << ( 1 + maxItemsExp + maxItemSizeExp ) );
 	g_AllocManager.initialize( SIZE );
@@ -326,6 +330,24 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 
 	TestBin* baseBuff = reinterpret_cast<TestBin*>( g_AllocManager.allocate( maxItems * sizeof(TestBin) ) );
 	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
+
+	// setup (saturation)
+	for ( size_t i=0;i<maxItems/32; ++i )
+	{
+		uint32_t randNum = (uint32_t)( rng() );
+		for ( size_t j=0; j<32; ++j )
+			if ( (randNum >> j) & 1 )
+			{
+				size_t randNumSz = rng();
+				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
+				baseBuff[i+32+j].sz = sz;
+				baseBuff[i+32+j].ptr = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
+				memset( baseBuff[i+32+j].ptr, (uint8_t)sz, sz );
+			}
+	}
+	testRes->rdtscSetup = __rdtsc() - start;
+
+	// main loop
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
@@ -345,8 +367,12 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
 			baseBuff[idx].sz = sz;
 			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
+			memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
 		}
 	}
+	testRes->rdtscMainLoop = __rdtsc() - testRes->rdtscSetup;
+
+	// exit
 	for ( size_t idx=0; idx<maxItems; ++idx )
 		if ( baseBuff[idx].ptr )
 		{
@@ -360,6 +386,9 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 	g_AllocManager.deallocate( baseBuff );
 	g_AllocManager.printStats();
 	g_AllocManager.disable();
+
+	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->innerDur = GetMillisecondCount() - start;
 		
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
@@ -367,6 +396,10 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 NOINLINE
 void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
+	testRes->threadID = threadID; // just as received
+	size_t start = GetMillisecondCount();
+	uint64_t rdtscStart = __rdtsc();
+
 	size_t maxItems = ((size_t)1) << maxItemsExp;
 	size_t itemIdxMask = maxItems - 1;
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
@@ -381,6 +414,23 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCou
 	TestBin* baseBuff = new TestBin [maxItems];
 	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
 
+	// setup (saturation)
+	for ( size_t i=0;i<maxItems/32; ++i )
+	{
+		uint32_t randNum = (uint32_t)( rng() );
+		for ( size_t j=0; j<32; ++j )
+			if ( (randNum >> j) & 1 )
+			{
+				size_t randNumSz = rng();
+				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
+				baseBuff[i+32+j].sz = sz;
+				baseBuff[i+32+j].ptr = new uint8_t[ sz ];
+				memset( baseBuff[i+32+j].ptr, (uint8_t)sz, sz );
+			}
+	}
+	testRes->rdtscSetup = __rdtsc() - start;
+
+	// main loop
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
@@ -400,8 +450,12 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCou
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
 			baseBuff[idx].sz = sz;
 			baseBuff[idx].ptr = new uint8_t[ sz ];
+			memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
 		}
 	}
+	testRes->rdtscMainLoop = __rdtsc() - testRes->rdtscSetup;
+
+	// exiting
 	for ( size_t idx=0; idx<maxItems; ++idx )
 		if ( baseBuff[idx].ptr )
 		{
@@ -412,12 +466,20 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCou
 			delete [] baseBuff[idx].ptr;
 		}
 	delete [] baseBuff;
+
+	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->innerDur = GetMillisecondCount() - start;
+
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
 
 NOINLINE
 void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
+	testRes->threadID = threadID; // just as received
+	size_t start = GetMillisecondCount();
+	uint64_t rdtscStart = __rdtsc();
+
 	size_t maxItems = ((size_t)1) << maxItemsExp;
 	size_t itemIdxMask = maxItems - 1;
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
@@ -429,6 +491,23 @@ void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t m
 	TestBin* baseBuff = new TestBin [maxItems];
 	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
 	size_t dummyCtr = 0;
+
+	// setup (saturation)
+	for ( size_t i=0;i<maxItems/32; ++i )
+	{
+		uint32_t randNum = (uint32_t)( rng() );
+		for ( size_t j=0; j<32; ++j )
+			if ( (randNum >> j) & 1 )
+			{
+				size_t randNumSz = rng();
+				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
+				baseBuff[i+32+j].sz = sz;
+				baseBuff[i+32+j].ptr = reinterpret_cast<uint8_t*>(sz+1);
+			}
+	}
+	testRes->rdtscSetup = __rdtsc() - start;
+
+	// main loop
 	for ( size_t i=0;i<iterCount; ++i )
 	{
 		size_t randNum = rng();
@@ -446,10 +525,17 @@ void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t m
 			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>(sz+1);
 		}
 	}
+	testRes->rdtscMainLoop = __rdtsc() - testRes->rdtscSetup;
+
+	// exiting
 	for ( size_t idx=0; idx<maxItems; ++idx )
 		if ( baseBuff[idx].ptr )
 			dummyCtr += baseBuff[idx].sz;
 	delete [] baseBuff;
+
+	testRes->rdtscExit = __rdtsc() - testRes->rdtscMainLoop;
+	testRes->innerDur = GetMillisecondCount() - start;
+
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
 
@@ -1855,6 +1941,19 @@ int main()
 		}
 
 		printf( "Test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
+		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
+		{
+			TestRes& tr = testRes[threadCount];
+			printf( "%zd,%zd,%zd,%zd,%f\n", params.startupParams.threadCount, tr.durEmpty, tr.durNewDel, tr.durPerThreadAlloc, (tr.durNewDel - tr.durEmpty) * 1. / (tr.durPerThreadAlloc - tr.durEmpty) );
+			printf( "Per-thread stats:\n" );
+			for ( size_t i=1;i<=threadCount;++i )
+			{
+				printf( "%d:\n", i );
+				ThreadTestRes& ttrEmpty = tr.threadResEmpty[i];
+			}
+		}
+
+		printf( "Short test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			printf( "%zd,%zd,%zd,%zd,%f\n", params.startupParams.threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
 	}

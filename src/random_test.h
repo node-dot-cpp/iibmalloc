@@ -139,6 +139,8 @@ enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDO
 
 struct ThreadTestRes
 {
+	size_t threadID;
+
 	size_t innerDur;
 
 	uint64_t rdtscTotal;

@@ -192,8 +192,8 @@ struct TestStartupParamsAndResults
 
 struct ThreadStartupParamsAndResults
 {
-	size_t threadID;
 	TestStartupParams startupParams;
+	size_t threadID;
 	ThreadTestRes* threadResEmpty;
 	ThreadTestRes* threadResNewDel;
 	ThreadTestRes* threadResPerThreadAlloc;

@@ -1824,6 +1824,7 @@ inline unsigned long long getRdtsc(void)
 
 int main()
 {
+	TestRes testRes[max_threads];
 //	TestRes testRes[max_threads];
 /*	uint64_t val1 = __builtin_ia32_rdtsc();
 	uint64_t val2 = getRdtsc();
@@ -1834,11 +1835,10 @@ int main()
 
 	if( 1 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
-		params.startupParams.iterCount = 1000000000;
+		params.startupParams.iterCount = 10000000;
 		params.startupParams.maxItemSize = 8;
 		params.startupParams.maxItems = 20;
 		params.startupParams.maxItemSize2 = 16;
@@ -1846,7 +1846,7 @@ int main()
 		params.startupParams.memReadCnt = 0;
 		params.startupParams.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
 
-		size_t threadCountMax = 23;
+		size_t threadCountMax = 3;
 
 		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{
@@ -1861,7 +1861,6 @@ int main()
 
 	if( 0 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
@@ -1888,7 +1887,6 @@ int main()
 
 	if( 0 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
@@ -1915,7 +1913,6 @@ int main()
 
 	if( 0 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
@@ -1942,7 +1939,6 @@ int main()
 
 	if( 0 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
@@ -1969,7 +1965,6 @@ int main()
 
 	if( 0 )
 	{
-		TestRes testRes[max_threads];
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;

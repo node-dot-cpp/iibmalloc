@@ -143,7 +143,7 @@ struct ThreadTestRes
 
 	size_t innerDur;
 
-	uint64_t rdtscTotal;
+	uint64_t rdtscBegin;
 	uint64_t rdtscSetup;
 	uint64_t rdtscMainLoop;
 	uint64_t rdtscExit;
@@ -165,8 +165,9 @@ struct ThreadTestRes
 
 void printThreadStats( const char* prefix, ThreadTestRes& res )
 {
-//	printf( "%s%d: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, res.rdtscTotal, res.rdtscSetup, res.rdtscMainLoop, res.rdtscExit );
-	printf( "%s%d: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, res.rdtscTotal, res.rdtscSetup * .1 / res.rdtscTotal, res.rdtscMainLoop * .1 / res.rdtscTotal, res.rdtscExit * .1 / res.rdtscTotal );
+	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
+//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 }
 
 struct TestRes

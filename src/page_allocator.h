@@ -212,10 +212,12 @@ public:
 struct BlockStats
 {
 	//alloc / dealloc ops
-	unsigned long allocCount = 0;
-	unsigned long allocSize = 0;
-	unsigned long deallocCount = 0;
-	unsigned long deallocSize = 0;
+	uint64_t allocCount = 0;
+	uint64_t allocSize = 0;
+	uint64_t deallocCount = 0;
+	uint64_t deallocSize = 0;
+	uint64_t rdtscSysAllocSpent = 0;
+	uint64_t rdtscSysDeallocSpent = 0;
 
 	void printStats()
 	{
@@ -229,14 +231,16 @@ struct BlockStats
 	}
 
 
-	void allocate(size_t sz)
+	void allocate(size_t sz, uint64_t rdtscSpent )
 	{
 		allocSize += sz;
+		rdtscSysAllocSpent += rdtscSpent;
 		++allocCount;
 	}
-	void deallocate(size_t sz)
+	void deallocate(size_t sz, uint64_t rdtscSpent)
 	{
 		deallocSize += sz;
+		rdtscSysDeallocSpent += rdtscSpent;
 		++deallocCount;
 	}
 };
@@ -256,8 +260,13 @@ public:
 	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
 		assert(isAlignedExp(sz, blockSizeExp));
+
+		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
-		stats.allocate(sz);
+		uint64_t end = __rdtsc();
+
+		stats.allocate( sz, end - start );
+
 		if (ptr)
 		{
 			MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(ptr);
@@ -274,9 +283,16 @@ public:
 	{
 		size_t ix = chk->getSizeIndex();
 		assert ( ix == 0 );
-		stats.deallocate(chk->getSize());
-		VirtualMemory::deallocate(chk, chk->getSize());
+
+		size_t sz = chk->getSize();
+		uint64_t start = __rdtsc();
+		VirtualMemory::deallocate(chk, sz );
+		uint64_t end = __rdtsc();
+		stats.deallocate( sz, end - start );
+
 	}
+
+	const BlockStats& getStats() const { return stats; }
 
 	void printStats()
 	{
@@ -324,8 +340,11 @@ public:
 			}
 		}
 
+		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
-		stats.allocate(sz);
+		uint64_t end = __rdtsc();
+		stats.allocate( sz, end - start );
+
 		if (ptr)
 		{
 			MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(ptr);
@@ -360,9 +379,14 @@ public:
 			return;
 		}
 
-		stats.deallocate(chk->getSize());
+		size_t sz = chk->getSize();
+		uint64_t start = __rdtsc();
 		VirtualMemory::deallocate(chk, chk->getSize());
+		uint64_t end = __rdtsc();
+		stats.deallocate( sz, end - start );
 	}
+
+	const BlockStats& getStats() const { return stats; }
 
 	void printStats()
 	{

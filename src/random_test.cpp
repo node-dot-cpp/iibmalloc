@@ -346,6 +346,10 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 			}
 	}
 	testRes->rdtscSetup = __rdtsc();
+	testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
+	testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().allocCount;
+	testRes->rdtscSysDeallocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysDeallocSpent;
+	testRes->sysDeallocCallCntAfterSetup = g_AllocManager.getStats().deallocCount;
 
 	// main loop
 	for ( size_t i=0;i<iterCount; ++i )
@@ -371,6 +375,10 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 		}
 	}
 	testRes->rdtscMainLoop = __rdtsc();
+	testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
+	testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().allocCount;
+	testRes->rdtscSysDeallocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysDeallocSpent;
+	testRes->sysDeallocCallCntAfterMainLoop = g_AllocManager.getStats().deallocCount;
 
 	// exit
 	for ( size_t idx=0; idx<maxItems; ++idx )
@@ -384,7 +392,11 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 		}
 
 	g_AllocManager.deallocate( baseBuff );
-	g_AllocManager.printStats();
+	testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
+	testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().allocCount;
+	testRes->rdtscSysDeallocCallSumAfterExit = g_AllocManager.getStats().rdtscSysDeallocSpent;
+	testRes->sysDeallocCallCntAfterExit = g_AllocManager.getStats().deallocCount;
+//	g_AllocManager.printStats();
 	g_AllocManager.disable();
 
 	testRes->rdtscExit = __rdtsc();
@@ -1950,8 +1962,8 @@ int main()
 			{
 				printf( "   %zd:\n", i );
 				printThreadStats( "   ", tr.threadResEmpty[i] );
-				printThreadStats( "   ", tr.threadResPerThreadAlloc[i] );
 				printThreadStats( "   ", tr.threadResNewDel[i] );
+				printThreadStatsEx( "   ", tr.threadResPerThreadAlloc[i] );
 			}
 		}
 		printf( "\n" );

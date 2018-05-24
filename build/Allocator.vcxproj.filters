@@ -9,6 +9,9 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="linux-staff-for-quick-editing">
+      <UniqueIdentifier>{3d2a025c-1acb-41fd-8a32-dfb0099569cb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\bucket_allocator.h">
@@ -39,6 +42,12 @@
     </ClCompile>
     <ClCompile Include="..\src\page_allocator_windows.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bucket_allocator_linux.cpp">
+      <Filter>linux-staff-for-quick-editing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\page_allocator_linux.cpp">
+      <Filter>linux-staff-for-quick-editing</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

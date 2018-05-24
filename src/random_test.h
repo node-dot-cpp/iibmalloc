@@ -170,6 +170,23 @@ void printThreadStats( const char* prefix, ThreadTestRes& res )
 	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 }
 
+void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
+{
+	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
+//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+	printf( "%s    [%zd, %zd (%zd)] [%zd, %zd (%zd)] [%zd, %zd (%zd)] \n", 
+		prefix, 
+		res.sysAllocCallCntAfterSetup, res.rdtscSysAllocCallSumAfterSetup, res.sysAllocCallCntAfterSetup ? res.rdtscSysAllocCallSumAfterSetup / res.sysAllocCallCntAfterSetup : 0,
+		res.sysAllocCallCntAfterMainLoop, res.rdtscSysAllocCallSumAfterMainLoop, res.sysAllocCallCntAfterMainLoop ? res.rdtscSysAllocCallSumAfterMainLoop / res.sysAllocCallCntAfterMainLoop : 0,
+		res.sysAllocCallCntAfterExit, res.rdtscSysAllocCallSumAfterExit, res.sysAllocCallCntAfterExit ? res.rdtscSysAllocCallSumAfterExit / res.sysAllocCallCntAfterExit : 0 );
+	printf( "%s    [%zd, %zd (%zd)] [%zd, %zd (%zd)] [%zd, %zd (%zd)] \n", 
+		prefix, 
+		res.sysDeallocCallCntAfterSetup, res.rdtscSysDeallocCallSumAfterSetup, res.sysDeallocCallCntAfterSetup ? res.rdtscSysDeallocCallSumAfterSetup / res.sysDeallocCallCntAfterSetup : 0,
+		res.sysDeallocCallCntAfterMainLoop, res.rdtscSysDeallocCallSumAfterMainLoop, res.sysDeallocCallCntAfterMainLoop ? res.rdtscSysDeallocCallSumAfterMainLoop / res.sysDeallocCallCntAfterMainLoop : 0,
+		res.sysDeallocCallCntAfterExit, res.rdtscSysDeallocCallSumAfterExit, res.sysDeallocCallCntAfterExit ? res.rdtscSysDeallocCallSumAfterExit / res.sysDeallocCallCntAfterExit : 0 );
+}
+
 struct TestRes
 {
 	size_t durEmpty;

@@ -690,6 +690,8 @@ struct HeapManager
 		}
 	}
 
+	const BlockStats& getStats() const { return freeChunks.getStats(); }
+
 	void printStats()
 	{
 		printf("----------------------\n");
@@ -791,6 +793,8 @@ public:
 				std::free(ptr);
 		}
 	}
+	
+	const BlockStats& getStats() const { return heap->getStats(); }
 	
 	void printStats()
 	{

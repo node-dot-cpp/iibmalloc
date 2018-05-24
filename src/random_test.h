@@ -55,7 +55,7 @@
 
 
 extern thread_local unsigned long long rnd_seed;
-constexpr size_t max_threads = 128;
+constexpr size_t max_threads = 32;
 
 FORCE_INLINE unsigned long long rng(void)
 {
@@ -133,7 +133,72 @@ inline void testDistribution()
 	assert( total == testCnt );
 }
 
-void doTest();
+enum { USE_PER_THREAD_ALLOCATOR, USE_NEW_DELETE, USE_EMPTY_TEST };
+enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
+	USE_FREQUENTANDINFREQUENT_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENT_SKEWEDBINSELECTION_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_SKEWEDBINSELECTION_RANDOMUNITSIZE };
+
+struct ThreadTestRes
+{
+	size_t innerDur;
+
+	uint64_t rdtscTotal;
+	uint64_t rdtscSetup;
+	uint64_t rdtscMainLoop;
+	uint64_t rdtscExit;
+
+	size_t sysAllocCallCntAfterSetup;
+	size_t sysDeallocCallCntAfterSetup;
+	size_t sysAllocCallCntAfterMainLoop;
+	size_t sysDeallocCallCntAfterMainLoop;
+	size_t sysAllocCallCntAfterExit;
+	size_t sysDeallocCallCntAfterExit;
+
+	uint64_t rdtscSysAllocCallSumAfterSetup;
+	uint64_t rdtscSysDeallocCallSumAfterSetup;
+	uint64_t rdtscSysAllocCallSumAfterMainLoop;
+	uint64_t rdtscSysDeallocCallSumAfterMainLoop;
+	uint64_t rdtscSysAllocCallSumAfterExit;
+	uint64_t rdtscSysDeallocCallSumAfterExit;
+};
+
+struct TestRes
+{
+	size_t durEmpty;
+	size_t durNewDel;
+	size_t durPerThreadAlloc;
+	ThreadTestRes threadResEmpty[max_threads];
+	ThreadTestRes threadResNewDel[max_threads];
+	ThreadTestRes threadResPerThreadAlloc[max_threads];
+};
+
+struct TestStartupParams
+{
+	size_t threadCount;
+	size_t calcMod;
+	size_t maxItems;
+	size_t maxItemSize;
+	size_t maxItems2;
+	size_t maxItemSize2;
+	size_t memReadCnt;
+	size_t iterCount;
+	size_t usePerThreadAllocator;
+};
+
+struct TestStartupParamsAndResults
+{
+	TestStartupParams startupParams;
+	TestRes* testRes;
+};
+
+struct ThreadStartupParamsAndResults
+{
+	size_t threadID;
+	TestStartupParams startupParams;
+	ThreadTestRes* threadResEmpty;
+	ThreadTestRes* threadResNewDel;
+	ThreadTestRes* threadResPerThreadAlloc;
+};
+
 
 
 #endif

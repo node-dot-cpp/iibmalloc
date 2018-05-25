@@ -187,7 +187,7 @@ void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 	uint64_t mainLoopAllocCntRdtsc = res.rdtscSysAllocCallSumAfterMainLoop - res.rdtscSysAllocCallSumAfterSetup;
 	size_t exitAllocCnt = res.sysAllocCallCntAfterExit - res.sysAllocCallCntAfterMainLoop;
 	uint64_t exitAllocCntRdtsc = res.rdtscSysAllocCallSumAfterExit - res.rdtscSysAllocCallSumAfterMainLoop;
-	printf( "%s    [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
 		prefix, 
 		res.allocRequestCountAfterSetup, res.sysAllocCallCntAfterSetup, res.rdtscSysAllocCallSumAfterSetup, res.sysAllocCallCntAfterSetup ? res.rdtscSysAllocCallSumAfterSetup / res.sysAllocCallCntAfterSetup : 0,
 		res.allocRequestCountAfterMainLoop - res.allocRequestCountAfterSetup, mainLoopAllocCnt, mainLoopAllocCntRdtsc, mainLoopAllocCnt ? mainLoopAllocCntRdtsc / mainLoopAllocCnt : 0,
@@ -197,7 +197,7 @@ void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 	uint64_t mainLoopDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterMainLoop - res.rdtscSysDeallocCallSumAfterSetup;
 	size_t exitDeallocCnt = res.sysDeallocCallCntAfterExit - res.sysDeallocCallCntAfterMainLoop;
 	uint64_t exitDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterExit - res.rdtscSysDeallocCallSumAfterMainLoop;
-	printf( "%s    [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
 		prefix, 
 		res.deallocRequestCountAfterSetup, res.sysDeallocCallCntAfterSetup, res.rdtscSysDeallocCallSumAfterSetup, res.sysDeallocCallCntAfterSetup ? res.rdtscSysDeallocCallSumAfterSetup / res.sysDeallocCallCntAfterSetup : 0,
 		res.deallocRequestCountAfterMainLoop - res.deallocRequestCountAfterSetup, mainLoopDeallocCnt, mainLoopDeallocCntRdtsc, mainLoopDeallocCnt ? mainLoopDeallocCntRdtsc / mainLoopDeallocCnt : 0,

@@ -212,36 +212,53 @@ public:
 struct BlockStats
 {
 	//alloc / dealloc ops
-	uint64_t allocCount = 0;
-	uint64_t allocSize = 0;
-	uint64_t deallocCount = 0;
-	uint64_t deallocSize = 0;
+	uint64_t sysAllocCount = 0;
+	uint64_t sysAllocSize = 0;
 	uint64_t rdtscSysAllocSpent = 0;
+
+	uint64_t sysDeallocCount = 0;
+	uint64_t sysDeallocSize = 0;
 	uint64_t rdtscSysDeallocSpent = 0;
+
+	uint64_t allocRequestCount;
+	uint64_t allocRequestSize;
+
+	uint64_t deallocRequestCount;
+	uint64_t deallocRequestSize;
 
 	void printStats()
 	{
-		printf("Allocs %lu (%lu), ", allocCount, allocSize);
-		printf("Deallocs %lu (%lu), ", deallocCount, deallocSize);
+		printf("Allocs %lu (%lu), ", sysAllocCount, sysAllocSize);
+		printf("Deallocs %lu (%lu), ", sysDeallocCount, sysDeallocSize);
 
-		long ct = allocCount - deallocCount;
-		long sz = allocSize - deallocSize;
+		long ct = sysAllocCount - sysDeallocCount;
+		long sz = sysAllocSize - sysDeallocSize;
 
 		printf("Diff %ld (%ld)\n\n", ct, sz);
 	}
 
-
-	void allocate(size_t sz, uint64_t rdtscSpent )
+	void registerAllocRequest( size_t sz )
 	{
-		allocSize += sz;
-		rdtscSysAllocSpent += rdtscSpent;
-		++allocCount;
+		allocRequestSize += sz;
+		++allocRequestCount;
 	}
-	void deallocate(size_t sz, uint64_t rdtscSpent)
+	void registerDeallocRequest( size_t sz )
 	{
-		deallocSize += sz;
+		deallocRequestSize += sz;
+		++deallocRequestCount;
+	}
+
+	void registerSysAlloc( size_t sz, uint64_t rdtscSpent )
+	{
+		sysAllocSize += sz;
+		rdtscSysAllocSpent += rdtscSpent;
+		++sysAllocCount;
+	}
+	void registerSysDealloc( size_t sz, uint64_t rdtscSpent )
+	{
+		sysDeallocSize += sz;
 		rdtscSysDeallocSpent += rdtscSpent;
-		++deallocCount;
+		++sysDeallocCount;
 	}
 };
 
@@ -259,13 +276,15 @@ public:
 
 	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
+		stats.registerAllocRequest( sz );
+
 		assert(isAlignedExp(sz, blockSizeExp));
 
 		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
 		uint64_t end = __rdtsc();
 
-		stats.allocate( sz, end - start );
+		stats.registerSysAlloc( sz, end - start );
 
 		if (ptr)
 		{
@@ -285,10 +304,11 @@ public:
 		assert ( ix == 0 );
 
 		size_t sz = chk->getSize();
+		stats.registerDeallocRequest( sz );
 		uint64_t start = __rdtsc();
 		VirtualMemory::deallocate(chk, sz );
 		uint64_t end = __rdtsc();
-		stats.deallocate( sz, end - start );
+		stats.registerSysDealloc( sz, end - start );
 
 	}
 
@@ -325,6 +345,8 @@ public:
 
 	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
+		stats.registerAllocRequest( sz );
+
 		assert(isAlignedExp(sz, blockSizeExp));
 
 		size_t ix = (sz >> blockSizeExp)-1;
@@ -343,7 +365,7 @@ public:
 		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
 		uint64_t end = __rdtsc();
-		stats.allocate( sz, end - start );
+		stats.registerSysAlloc( sz, end - start );
 
 		if (ptr)
 		{
@@ -362,6 +384,8 @@ public:
 //		assert(!chk->isFree());
 //		assert(!chk->isInList());
 
+		size_t sz = chk->getSize();
+		stats.registerDeallocRequest( sz );
 		size_t ix = chk->getSizeIndex();
 		if ( ix == 0 ) // quite likely case (all bucket chunks)
 		{
@@ -379,11 +403,10 @@ public:
 			return;
 		}
 
-		size_t sz = chk->getSize();
 		uint64_t start = __rdtsc();
-		VirtualMemory::deallocate(chk, chk->getSize());
+		VirtualMemory::deallocate(chk, sz );
 		uint64_t end = __rdtsc();
-		stats.deallocate( sz, end - start );
+		stats.registerSysDealloc( sz, end - start );
 	}
 
 	const BlockStats& getStats() const { return stats; }

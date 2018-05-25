@@ -340,16 +340,18 @@ void randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterC
 			{
 				size_t randNumSz = rng();
 				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
-				baseBuff[i+32+j].sz = sz;
-				baseBuff[i+32+j].ptr = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
-				memset( baseBuff[i+32+j].ptr, (uint8_t)sz, sz );
+				baseBuff[i*32+j].sz = sz;
+				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>( g_AllocManager.allocate( sz ) );
+				memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
 			}
 	}
 	testRes->rdtscSetup = __rdtsc();
 	testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
-	testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().allocCount;
+	testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().sysAllocCount;
 	testRes->rdtscSysDeallocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysDeallocSpent;
-	testRes->sysDeallocCallCntAfterSetup = g_AllocManager.getStats().deallocCount;
+	testRes->sysDeallocCallCntAfterSetup = g_AllocManager.getStats().sysDeallocCount;
+	testRes->allocRequestCountAfterSetup = g_AllocManager.getStats().allocRequestCount;
+	testRes->deallocRequestCountAfterSetup = g_AllocManager.getStats().deallocRequestCount;
 
 	// main loop
 	for ( size_t i=0;i<iterCount; ++i )
@@ -376,9 +378,11 @@ void randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterC
 	}
 	testRes->rdtscMainLoop = __rdtsc();
 	testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
-	testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().allocCount;
+	testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().sysAllocCount;
 	testRes->rdtscSysDeallocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysDeallocSpent;
-	testRes->sysDeallocCallCntAfterMainLoop = g_AllocManager.getStats().deallocCount;
+	testRes->sysDeallocCallCntAfterMainLoop = g_AllocManager.getStats().sysDeallocCount;
+	testRes->allocRequestCountAfterMainLoop = g_AllocManager.getStats().allocRequestCount;
+	testRes->deallocRequestCountAfterMainLoop = g_AllocManager.getStats().deallocRequestCount;
 
 	// exit
 	for ( size_t idx=0; idx<maxItems; ++idx )
@@ -393,10 +397,13 @@ void randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterC
 
 	g_AllocManager.deallocate( baseBuff );
 	testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
-	testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().allocCount;
+	testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().sysAllocCount;
 	testRes->rdtscSysDeallocCallSumAfterExit = g_AllocManager.getStats().rdtscSysDeallocSpent;
-	testRes->sysDeallocCallCntAfterExit = g_AllocManager.getStats().deallocCount;
-//	g_AllocManager.printStats();
+	testRes->sysDeallocCallCntAfterExit = g_AllocManager.getStats().sysDeallocCount;
+	testRes->allocRequestCountAfterExit = g_AllocManager.getStats().allocRequestCount;
+	testRes->deallocRequestCountAfterExit = g_AllocManager.getStats().deallocRequestCount;
+
+	//	g_AllocManager.printStats();
 	g_AllocManager.disable();
 
 	testRes->rdtscExit = __rdtsc();
@@ -435,9 +442,9 @@ void randomPos_RandomSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCount, 
 			{
 				size_t randNumSz = rng();
 				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
-				baseBuff[i+32+j].sz = sz;
-				baseBuff[i+32+j].ptr = new uint8_t[ sz ];
-				memset( baseBuff[i+32+j].ptr, (uint8_t)sz, sz );
+				baseBuff[i*32+j].sz = sz;
+				baseBuff[i*32+j].ptr = new uint8_t[ sz ];
+				memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
 			}
 	}
 	testRes->rdtscSetup = __rdtsc();
@@ -513,8 +520,8 @@ void randomPos_RandomSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxIt
 			{
 				size_t randNumSz = rng();
 				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
-				baseBuff[i+32+j].sz = sz;
-				baseBuff[i+32+j].ptr = reinterpret_cast<uint8_t*>(sz+1);
+				baseBuff[i*32+j].sz = sz;
+				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>(sz+1);
 			}
 	}
 	testRes->rdtscSetup = __rdtsc();
@@ -1944,7 +1951,7 @@ int main()
 		params.startupParams.memReadCnt = 0;
 		params.startupParams.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
 
-		size_t threadCountMax = 1;
+		size_t threadCountMax = 23;
 
 		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{

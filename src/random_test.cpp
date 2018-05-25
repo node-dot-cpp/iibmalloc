@@ -305,7 +305,7 @@ void randomPos_FixedSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxIte
 
 
 NOINLINE
-void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
+void randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
 	testRes->threadID = threadID; // just as received
 	size_t start = GetMillisecondCount();
@@ -406,7 +406,7 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( size_t i
 }
 
 NOINLINE
-void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
+void randomPos_RandomSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
 	testRes->threadID = threadID; // just as received
 	size_t start = GetMillisecondCount();
@@ -486,7 +486,7 @@ void randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( size_t iterCou
 }
 
 NOINLINE
-void randomPos_RandomSizeSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
+void randomPos_RandomSize_FullMemAccess_EmptyExp( size_t iterCount, size_t maxItemsExp, size_t maxItemSizeExp, size_t threadID, ThreadTestRes* testRes )
 {
 	testRes->threadID = threadID; // just as received
 	size_t start = GetMillisecondCount();
@@ -1678,16 +1678,16 @@ void* runRandomTest( void* params )
 			switch ( testParams->startupParams.usePerThreadAllocator )
 			{
 				case USE_PER_THREAD_ALLOCATOR:
-					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocator() ...\n", testParams->threadID );
-					randomPos_RandomSizeSize_FullMemAccess_UsingPerThreadAllocatorExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResPerThreadAlloc );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocator() ...\n", testParams->threadID );
+					randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResPerThreadAlloc );
 					break;
 				case USE_NEW_DELETE:
-					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDelete() ...\n", testParams->threadID );
-					randomPos_RandomSizeSize_FullMemAccess_UsingNewAndDeleteExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResNewDel );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingNewAndDelete() ...\n", testParams->threadID );
+					randomPos_RandomSize_FullMemAccess_UsingNewAndDeleteExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResNewDel );
 					break;
 				case USE_EMPTY_TEST:
-					printf( "    running thread %zd with randomPos_RandomSizeSize_FullMemAccess_Empty() ...\n", testParams->threadID );
-					randomPos_RandomSizeSize_FullMemAccess_EmptyExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResEmpty );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_Empty() ...\n", testParams->threadID );
+					randomPos_RandomSize_FullMemAccess_EmptyExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResEmpty );
 					break;
 				default:
 					assert( false );
@@ -1936,7 +1936,7 @@ int main()
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
-		params.startupParams.iterCount = 10000000;
+		params.startupParams.iterCount = 100000000;
 		params.startupParams.maxItemSize = 8;
 		params.startupParams.maxItems = 20;
 		params.startupParams.maxItemSize2 = 16;
@@ -1944,7 +1944,7 @@ int main()
 		params.startupParams.memReadCnt = 0;
 		params.startupParams.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
 
-		size_t threadCountMax = 23;
+		size_t threadCountMax = 1;
 
 		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{

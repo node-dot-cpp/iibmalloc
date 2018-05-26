@@ -75,9 +75,9 @@ struct MemoryBlockListItem
 	typedef size_t SizeT; //todo
 //	static constexpr SizeT INUSE_FLAG = 1;
 	SizeT size;
-	uint8_t sizeIndex;
+	SizeT sizeIndex;
 
-	void initialize(SizeT sz, uint8_t szIndex)
+	void initialize(SizeT sz, SizeT szIndex)
 	{
 		size = sz;
 		prev = nullptr;
@@ -90,7 +90,7 @@ struct MemoryBlockListItem
 		next = this;
 		prev = this;
 	}
-	uint8_t getSizeIndex() const { return sizeIndex; }
+	SizeT getSizeIndex() const { return sizeIndex; }
 	SizeT getSize() const {	return size; }
 
 	void listInsertNext(MemoryBlockListItem* other)

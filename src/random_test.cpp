@@ -1860,7 +1860,7 @@ int main()
 	{
 		TestStartupParams params;
 		params.iterCount = 1000000;
-		params.maxItemSize = 18;
+		params.maxItemSize = 12;
 		params.maxItems = 10;
 		params.maxItemSize2 = 12;
 		params.maxItems2 = 16;

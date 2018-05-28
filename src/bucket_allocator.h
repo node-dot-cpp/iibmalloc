@@ -774,9 +774,8 @@ struct HeapManager
 	}
 };
 
-//typedef BigBlockBase<BucketSizes, ChunkSizes> BigBlock;
-typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorHashMap> Heap;
-//typedef BigBlockBase<BucketSizes2, ChunkSizes> BigBlock;
+//typedef HeapManager<BucketSizes2, PageAllocator> Heap;
+typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorMap> Heap;
 
 class SerializableAllocatorBase
 {

@@ -159,7 +159,7 @@ void* VirtualMemory::allocate(size_t size)
 
 void VirtualMemory::deallocate(void* ptr, size_t size)
 {
-	bool OK = VirtualFree(ptr, 0, MEM_RELEASE);
+	bool OK = VirtualFree(ptr, size, MEM_RELEASE);
 //	bool OK = VirtualFree(ptr, size, MEM_RELEASE);
 	assert( OK );
 	decommitSz += size;

@@ -42,6 +42,7 @@
 #include "page_allocator.h"
 //#include <map>
 #include <set>
+#include <chrono>
 
 
 FORCE_INLINE constexpr
@@ -460,6 +461,7 @@ struct PageDescriptorMap
 		ContainerAllocator<PageDescriptor>> Container;
 	SimplifiedBucketAllocator buckets;
 
+	std::chrono::microseconds timeAccum;
 	Container* descriptors = nullptr;
 	static_assert(sizeof(Container) <= SimplifiedBucketSize, "Please increase SimplifiedBucketSize!");
 
@@ -480,8 +482,13 @@ struct PageDescriptorMap
 
 	PageDescriptor* find(void* ptr)
 	{
+		auto begin_time = std::chrono::steady_clock::now();
 		Container::iterator it = descriptors->find(PageDescriptor(ptr,0));
 		assert(it != descriptors->end());
+
+		auto end_time = std::chrono::steady_clock::now();
+		std::chrono::microseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - begin_time);
+		timeAccum += time;
 
 		//mb: const_cast is safe here, because key elements are inmutable in PageDescriptor
 		return const_cast<PageDescriptor*>(&(*it));
@@ -496,6 +503,11 @@ struct PageDescriptorMap
 	void doHouseKeeping(Allocator* alloc)
 	{
 		buckets.doHouseKeeping(alloc);
+	}
+
+	void printStats()
+	{
+		printf("Time spent on find (%lld)\n", timeAccum.count());
 	}
 };
 
@@ -605,6 +617,7 @@ public:
 	void printStats()
 	{
 		stats.printStats();
+		descriptors.printStats();
 	}
 };
 
@@ -613,11 +626,12 @@ struct PageDescriptorMap2
 {
 	SimplifiedBucketAllocator buckets;
 
+	std::chrono::microseconds timeAccum;
 	uint8_t blockSizeExp;
 	uint8_t hashBucketExp;
 	size_t hashBucketMask;
 	ItemList* hashMap;
-	std::array<ItemList, 64> initialHashMap;
+	std::array<ItemList, 1024> initialHashMap;
 
 	PageDescriptorMap2() :
 		hashBucketExp(sizeToExp(initialHashMap.size())),
@@ -661,6 +675,7 @@ struct PageDescriptorMap2
 
 	PageDescriptor* getDescriptor(void* ptr)
 	{
+		auto begin_time = std::chrono::steady_clock::now();
 		size_t h = getHash(ptr);
 		assert(!hashMap[h].empty());
 
@@ -672,6 +687,9 @@ struct PageDescriptorMap2
 			if (pd->toPtr() == ptr)
 			{
 				hashMap[h].remove(pd);
+				auto end_time = std::chrono::steady_clock::now();
+				std::chrono::microseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - begin_time);
+				timeAccum += time;
 				return pd;
 			}
 			current = current->listGetNext();
@@ -692,6 +710,12 @@ struct PageDescriptorMap2
 	{
 		buckets.doHouseKeeping(alloc);
 	}
+
+	void printStats()
+	{
+		printf("Time spent on find (%lld)\n", timeAccum.count());
+	}
+
 };
 
 
@@ -800,6 +824,7 @@ public:
 	void printStats()
 	{
 		stats.printStats();
+		descriptors.printStats();
 	}
 };
 

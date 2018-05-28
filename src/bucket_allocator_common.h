@@ -67,7 +67,8 @@ template<size_t IX>
 constexpr
 uint8_t sizeToExpImpl(size_t sz)
 {
-	return (sz == (1ull << IX)) ? IX : sizeToExpImpl<IX - 1>(sz);
+	constexpr size_t shifted = (1ull) << (IX);
+	return (sz == shifted) ? IX : sizeToExpImpl<IX - 1>(sz);
 }
 
 template<>
@@ -126,7 +127,7 @@ uintptr_t alignUpMask(uintptr_t sz, uintptr_t alignmentMask)
 inline constexpr
 uintptr_t alignUpExp(uintptr_t sz, uintptr_t alignmentExp)
 {
-	return( -((-sz) >> alignmentExp ) << alignmentExp);
+	return ( ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)sz))))))) >> alignmentExp ) << alignmentExp);
 }
 
 

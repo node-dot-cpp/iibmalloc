@@ -253,18 +253,22 @@ public:
 //		this->bucketsEnd = bucketsEnd;
 
 //		size_t totalB = (bucketsEnd - bucketsBegin) / bucketSize;
-		this->totalBuckets = bucketsCount;
+		assert( bucketsCount <= UINT16_MAX );
+		this->totalBuckets = (uint16_t)(bucketsCount);
 //		this->freeBuckets = totalBuckets;
 
 		freeBucketListNext = 0;
 		// free list initialization
 
-
-		uint16_t bkt = bucketsBegin >> SIZE_EXP;
+		size_t szt_bkt = bucketsBegin >> SIZE_EXP;
+		assert( szt_bkt <= UINT16_MAX);
+		size_t szt_bktsz = bucketSize >> SIZE_EXP;
+		assert( szt_bktsz <= UINT16_MAX);
+		uint16_t bkt = (uint16_t)szt_bkt;
 		for (uint16_t i = 0; i < totalBuckets; ++i)
 		{
 			freeBucketList[i] = bkt;
-			bkt += (bucketSize >> SIZE_EXP);
+			bkt += (uint16_t)szt_bktsz;
 		}
 //		assert(bkt == (bucketsEnd >> SIZE_EXP));
 	}

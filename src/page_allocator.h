@@ -228,13 +228,13 @@ struct BlockStats
 
 	void printStats()
 	{
-		printf("Allocs %lu (%lu), ", sysAllocCount, sysAllocSize);
-		printf("Deallocs %lu (%lu), ", sysDeallocCount, sysDeallocSize);
+		printf("Allocs %zd (%zd), ", sysAllocCount, sysAllocSize);
+		printf("Deallocs %zd (%zd), ", sysDeallocCount, sysDeallocSize);
 
-		long ct = sysAllocCount - sysDeallocCount;
-		long sz = sysAllocSize - sysDeallocSize;
+		uint64_t ct = sysAllocCount - sysDeallocCount;
+		uint64_t sz = sysAllocSize - sysDeallocSize;
 
-		printf("Diff %ld (%ld)\n\n", ct, sz);
+		printf("Diff %zd (%zd)\n\n", ct, sz);
 	}
 
 	void registerAllocRequest( size_t sz )

@@ -32,7 +32,7 @@
  * -------------------------------------------------------------------------------*/
  
  
-#include "bucket_allocator.h"
+#include "page_allocator.h"
 
 #include <cstdlib>
 #include <cstddef>
@@ -45,37 +45,74 @@
 #include <fcntl.h>
 
 
-thread_local SerializableAllocatorBase g_AllocManager;
+thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
+
+// limit below is single read or write op in linux
+static constexpr size_t MAX_LINUX = 0x7ffff000;
+// [DI: what depends on what/] static_assert(MAX_LINUX <= MAX_CHUNK_SIZE, "Use of big chunks needs review.");
+
+/*static*/
+size_t VirtualMemory::getPageSize()
+{
+	long sz = sysconf(_SC_PAGESIZE);
+	assert(sz != -1);
+	return sz;  
+}
+
+/*static*/
+size_t VirtualMemory::getAllocGranularity()
+{
+	// On linux page size and alloc granularity are the same thing
+	return getPageSize();
+}
+
+size_t commitCtr = 0;
+size_t decommitCtr = 0;
+size_t commitSz = 0;
+size_t decommitSz = 0;
+size_t nowAllocated = 0;
+size_t maxAllocated = 0;
 
 
-// void* operator new(std::size_t count)
-// {
-// 	return g_AllocManager.allocate(count);
-// }
-// 
-// void* operator new[](std::size_t count)
-// {
-// 	return g_AllocManager.allocate(count);
-// }
-// 
-// void operator delete(void* ptr) noexcept
-// {
-// 	g_AllocManager.deallocate(ptr);
-// }
-// 
-// void operator delete[](void* ptr) noexcept
-// {
-// 	g_AllocManager.deallocate(ptr);
-// }
+/*static*/
+uint8_t* VirtualMemory::reserve(void* addr, size_t size)
+{
+	return nullptr;
+}
 
-#if __cplusplus >= 201703L
+/*static*/
+void VirtualMemory::commit(uintptr_t addr, size_t size)
+{
+	assert(false);
+}
 
-//We don't support alignment new/delete yet
+///*static*/
+void VirtualMemory::decommit(uintptr_t addr, size_t size)
+{
+	assert(false);
+}
 
-//void* operator new(std::size_t count, std::align_val_t alignment);
-//void* operator new[](std::size_t count, std::align_val_t alignment);
-//void operator delete(void* ptr, std::align_val_t al) noexcept;
-//void operator delete[](void* ptr, std::align_val_t al) noexcept;
-#endif
+void* VirtualMemory::allocate(size_t size)
+{
+	void* ptr = mmap(nullptr, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (!ptr)
+		throw std::bad_alloc();
+
+	++commitCtr;
+	commitSz += size;
+
+	return ptr;
+}
+
+void VirtualMemory::deallocate(void* ptr, size_t size)
+{
+	assert( size == 4096 );
+	int ret = munmap(ptr, size);
+	assert( ret == 0 );
+
+	decommitSz += size;
+	++decommitCtr;
+}
+
 
 

@@ -55,7 +55,7 @@
 
 
 extern thread_local unsigned long long rnd_seed;
-constexpr size_t max_threads = 128;
+constexpr size_t max_threads = 32;
 
 FORCE_INLINE unsigned long long rng(void)
 {
@@ -133,7 +133,115 @@ inline void testDistribution()
 	assert( total == testCnt );
 }
 
-void doTest();
+enum { TRY_ALL = 0xFFFFFFFF, USE_EMPTY_TEST = 0x1, USE_PER_THREAD_ALLOCATOR = 0x2, USE_NEW_DELETE = 0x4, };
+enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
+	USE_FREQUENTANDINFREQUENT_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENT_SKEWEDBINSELECTION_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_SKEWEDBINSELECTION_RANDOMUNITSIZE };
+
+struct ThreadTestRes
+{
+	size_t threadID;
+
+	size_t innerDur;
+
+	uint64_t rdtscBegin;
+	uint64_t rdtscSetup;
+	uint64_t rdtscMainLoop;
+	uint64_t rdtscExit;
+
+	size_t sysAllocCallCntAfterSetup;
+	size_t sysDeallocCallCntAfterSetup;
+	size_t sysAllocCallCntAfterMainLoop;
+	size_t sysDeallocCallCntAfterMainLoop;
+	size_t sysAllocCallCntAfterExit;
+	size_t sysDeallocCallCntAfterExit;
+
+	uint64_t rdtscSysAllocCallSumAfterSetup;
+	uint64_t rdtscSysDeallocCallSumAfterSetup;
+	uint64_t rdtscSysAllocCallSumAfterMainLoop;
+	uint64_t rdtscSysDeallocCallSumAfterMainLoop;
+	uint64_t rdtscSysAllocCallSumAfterExit;
+	uint64_t rdtscSysDeallocCallSumAfterExit;
+
+	uint64_t allocRequestCountAfterSetup;
+	uint64_t deallocRequestCountAfterSetup;
+	uint64_t allocRequestCountAfterMainLoop;
+	uint64_t deallocRequestCountAfterMainLoop;
+	uint64_t allocRequestCountAfterExit;
+	uint64_t deallocRequestCountAfterExit;
+};
+
+void printThreadStats( const char* prefix, ThreadTestRes& res )
+{
+	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
+//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+}
+
+void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
+{
+	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
+//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+
+	size_t mainLoopAllocCnt = res.sysAllocCallCntAfterMainLoop - res.sysAllocCallCntAfterSetup;
+	uint64_t mainLoopAllocCntRdtsc = res.rdtscSysAllocCallSumAfterMainLoop - res.rdtscSysAllocCallSumAfterSetup;
+	size_t exitAllocCnt = res.sysAllocCallCntAfterExit - res.sysAllocCallCntAfterMainLoop;
+	uint64_t exitAllocCntRdtsc = res.rdtscSysAllocCallSumAfterExit - res.rdtscSysAllocCallSumAfterMainLoop;
+	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+		prefix, 
+		res.allocRequestCountAfterSetup, res.sysAllocCallCntAfterSetup, res.rdtscSysAllocCallSumAfterSetup, res.sysAllocCallCntAfterSetup ? res.rdtscSysAllocCallSumAfterSetup / res.sysAllocCallCntAfterSetup : 0,
+		res.allocRequestCountAfterMainLoop - res.allocRequestCountAfterSetup, mainLoopAllocCnt, mainLoopAllocCntRdtsc, mainLoopAllocCnt ? mainLoopAllocCntRdtsc / mainLoopAllocCnt : 0,
+		res.allocRequestCountAfterExit - res.allocRequestCountAfterMainLoop, exitAllocCnt, exitAllocCntRdtsc, exitAllocCnt ? exitAllocCntRdtsc / exitAllocCnt : 0 );
+
+	size_t mainLoopDeallocCnt = res.sysDeallocCallCntAfterMainLoop - res.sysDeallocCallCntAfterSetup;
+	uint64_t mainLoopDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterMainLoop - res.rdtscSysDeallocCallSumAfterSetup;
+	size_t exitDeallocCnt = res.sysDeallocCallCntAfterExit - res.sysDeallocCallCntAfterMainLoop;
+	uint64_t exitDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterExit - res.rdtscSysDeallocCallSumAfterMainLoop;
+	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+		prefix, 
+		res.deallocRequestCountAfterSetup, res.sysDeallocCallCntAfterSetup, res.rdtscSysDeallocCallSumAfterSetup, res.sysDeallocCallCntAfterSetup ? res.rdtscSysDeallocCallSumAfterSetup / res.sysDeallocCallCntAfterSetup : 0,
+		res.deallocRequestCountAfterMainLoop - res.deallocRequestCountAfterSetup, mainLoopDeallocCnt, mainLoopDeallocCntRdtsc, mainLoopDeallocCnt ? mainLoopDeallocCntRdtsc / mainLoopDeallocCnt : 0,
+		res.deallocRequestCountAfterExit - res.deallocRequestCountAfterMainLoop, exitDeallocCnt, exitDeallocCntRdtsc, exitDeallocCnt ? exitDeallocCntRdtsc / exitDeallocCnt : 0 );
+}
+
+struct TestRes
+{
+	size_t durEmpty;
+	size_t durNewDel;
+	size_t durPerThreadAlloc;
+	ThreadTestRes threadResEmpty[max_threads];
+	ThreadTestRes threadResNewDel[max_threads];
+	ThreadTestRes threadResPerThreadAlloc[max_threads];
+};
+
+struct TestStartupParams
+{
+	size_t threadCount;
+	size_t calcMod;
+	size_t maxItems;
+	size_t maxItemSize;
+	size_t maxItems2;
+	size_t maxItemSize2;
+	size_t memReadCnt;
+	size_t iterCount;
+	size_t allocatorType;
+};
+
+struct TestStartupParamsAndResults
+{
+	TestStartupParams startupParams;
+	TestRes* testRes;
+};
+
+struct ThreadStartupParamsAndResults
+{
+	TestStartupParams startupParams;
+	size_t threadID;
+	ThreadTestRes* threadResEmpty;
+	ThreadTestRes* threadResNewDel;
+	ThreadTestRes* threadResPerThreadAlloc;
+};
+
 
 
 #endif

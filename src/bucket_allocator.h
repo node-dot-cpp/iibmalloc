@@ -37,36 +37,14 @@
 
 #define NOMINMAX
 
+
 #include <cstdlib>
-#include <cstddef>
-#include <cinttypes>
-#include <memory>
 #include <cstring>
 #include <limits>
 #include <algorithm>
-#include <array>
 
-// can't use AASSERTx because fmt::format allocates and gets recursive
-#include <cassert>
-//#include "../../../include/aassert.h"
-//#include "../../../3rdparty/cppformat/fmt/format.h"
-
-#if _MSC_VER
-#include <intrin.h>
-#define ALIGN(n)      __declspec(align(n))
-#define NOINLINE      __declspec(noinline)
-#define FORCE_INLINE	__forceinline
-#elif __GNUC__
-#define ALIGN(n)      __attribute__ ((aligned(n))) 
-#define NOINLINE      __attribute__ ((noinline))
-#define	FORCE_INLINE inline __attribute__((always_inline))
-#else
-#define	FORCE_INLINE inline
-#define NOINLINE
-//#define ALIGN(n)
-#warning ALIGN, FORCE_INLINE and NOINLINE may not be properly defined
-#endif
-
+#include "bucket_allocator_common.h"
+#include "page_allocator.h"
 
 
 
@@ -81,164 +59,9 @@ static union
 	uint64_t asUint;
 } SerializableAllocatorMagic;
 
-template<size_t IX>
-constexpr
-uint8_t sizeToExpImpl(size_t sz)
+
+struct Chunk :public MemoryBlockListItem
 {
-	return (sz == (1ull << IX)) ? IX : sizeToExpImpl<IX - 1>(sz);
-}
-
-template<>
-constexpr
-uint8_t sizeToExpImpl<0>(size_t sz)
-{
-	return 0; // error?
-}
-
-FORCE_INLINE constexpr
-uint8_t sizeToExp(size_t sz)
-{
-	// keep it reasonable!
-	return sizeToExpImpl<32>(sz);
-}
-
-FORCE_INLINE constexpr
-size_t expToSize(uint8_t exp)
-{
-	return static_cast<size_t>(1) << exp;
-}
-
-static_assert(sizeToExp(64 * 1024) == 16, "broken!");
-
-FORCE_INLINE constexpr
-size_t expToMask(size_t sz)
-{
-	// keep it reasonable!
-	return (static_cast<size_t>(1) << sz) - 1;
-}
-
-
-FORCE_INLINE constexpr
-bool isAlignedMask(uintptr_t sz, uintptr_t alignmentMask)
-{
-	return (sz & alignmentMask) == 0;
-}
-
-FORCE_INLINE constexpr
-uintptr_t alignDownExp(uintptr_t sz, uintptr_t alignmentExp)
-{
-	return ( sz >> alignmentExp ) << alignmentExp;
-}
-
-inline constexpr
-bool isAlignedExp(uintptr_t sz, uintptr_t alignment)
-{
-	return alignDownExp(sz, alignment) == sz;
-}
-
-FORCE_INLINE constexpr
-uintptr_t alignUpMask(uintptr_t sz, uintptr_t alignmentMask)
-{
-	return (( sz & alignmentMask) == 0) ? sz : sz - (sz & alignmentMask) + alignmentMask + 1;
-}
-inline constexpr
-uintptr_t alignUpExp(uintptr_t sz, uintptr_t alignmentExp)
-{
-	return( -((-sz) >> alignmentExp ) << alignmentExp);
-}
-
-/* OS specific implementations */
-class VirtualMemory
-{
-public:
-	static size_t getPageSize();
-	static size_t getAllocGranularity();
-
-	static unsigned char* reserve(void* addr, size_t size);
-	static void commit(uintptr_t addr, size_t size);
-	static void decommit(uintptr_t addr, size_t size);
-
-	static void* allocate(size_t size);
-	static void deallocate(void* ptr, size_t size);
-//	static void release(void* addr);
-};
-
-struct ListItem
-{
-	ListItem* next;
-	ListItem* prev;
-
-	void listInitializeNull()
-	{
-		next = nullptr;
-		prev = nullptr;
-	}
-
-	void listInitializeEmpty()
-	{
-		next = this;
-		prev = this;
-	}
-
-	void listInsertNext(ListItem* other)
-	{
-		assert(isInList());
-		assert(!other->isInList());
-
-		other->next = this->next;
-		other->prev = this;
-		next->prev = other;
-		next = other;
-	}
-
-	ListItem* listGetNext()
-	{
-		return next;
-	}
-
-	
-	ListItem* listGetPrev()
-	{
-		return prev;
-	}
-
-	bool isInList() const
-	{
-		if (prev == nullptr && next == nullptr)
-			return false;
-		else
-		{
-			assert(prev != nullptr);
-			assert(next != nullptr);
-			return true;
-		}
-	}
-
-	void removeFromList()
-	{
-		assert(prev != nullptr);
-		assert(next != nullptr);
-
-		prev->next = next;
-		next->prev = prev;
-
-		next = nullptr;
-		prev = nullptr;
-	}
-
-
-};
-
-
-
-struct Chunk :public ListItem
-{
-	typedef size_t SizeT; //todo
-//	static constexpr SizeT INUSE_FLAG = 1;
-	SizeT size;
-	//SizeT sizeBefore;
-	uint8_t sizeIndex;
-
 	//TODO consider merging all in a single byte
 	uint8_t inUse;
 //	uint8_t last;
@@ -252,24 +75,9 @@ struct Chunk :public ListItem
 	} bucketKind;
 
 
-	void initialize(SizeT sz, uint8_t szIndex)
+	void initialize()
 	{
-		size = sz;
-		prev = nullptr;
-		next = nullptr;
-		sizeIndex = szIndex;
 		bucketKind = Free;
-	}
-
-	SizeT getSize() const
-	{
-		return size;
-	}
-
-	void setSize(SizeT sz, uint8_t szIx) 
-	{
-		size = sz;
-		sizeIndex = szIx;
 	}
 
 	bool isFree() const {return bucketKind == Free;}
@@ -283,7 +91,6 @@ struct Chunk :public ListItem
 	//bool noFlags() const { return isFree() && getBucketKind() == NoBucket; }
 	//void clearFlags() { clearInUse(); setBucketKind(NoBucket); }
 
-	uint8_t getSizeIndex() const { return sizeIndex; }
 
 	//void updateAfterSize(size_t sz)
 	//{
@@ -642,197 +449,11 @@ public:
 	}
 };
 
-
-class ChunkList
-{
-private:
-	uint32_t count = 0;
-	ListItem lst;
-public:
-	
-	ChunkList()
-	{
-		lst.listInitializeEmpty();
-	}
-
-	FORCE_INLINE
-	bool empty() const { return count == 0; }
-	FORCE_INLINE
-		uint32_t size() const { return count; }
-	FORCE_INLINE
-		bool isEnd(ListItem* item) const { return item == &lst; }
-
-	FORCE_INLINE
-	ListItem* front()
-
-	{
-		return lst.listGetNext();
-	}
-
-	FORCE_INLINE
-	void pushFront(ListItem* chk)
-	{
-		lst.listInsertNext(chk);
-		++count;
-	}
-
-	FORCE_INLINE
-	ListItem* popFront()
-	{
-		assert(!empty());
-
-		ListItem* chk = lst.listGetNext();
-		chk->removeFromList();
-		--count;
-
-		return chk;
-	}
-
-	FORCE_INLINE
-		ListItem* popBack()
-	{
-		assert(!empty());
-
-		ListItem* chk = lst.listGetPrev();
-		chk->removeFromList();
-		--count;
-
-		return chk;
-	}
-
-	FORCE_INLINE
-	void remove(ListItem* chk)
-	{
-		chk->removeFromList();
-		--count;
-	}
-
-	size_t getCount() const { return count; }
-};
-
 struct UsedBlockLists
 {
-	ChunkList partials;
-	ChunkList fulls;
-	ChunkList emptys;
-};
-
-struct BlockStats
-{
-	//alloc / dealloc ops
-	unsigned long allocCount = 0;
-	unsigned long allocSize = 0;
-	unsigned long deallocCount = 0;
-	unsigned long deallocSize = 0;
-
-	void printStats()
-	{
-		printf("Allocs %lu (%lu), ", allocCount, allocSize);
-		printf("Deallocs %lu (%lu), ", deallocCount, deallocSize);
-
-		long ct = allocCount - deallocCount;
-		long sz = allocSize - deallocSize;
-
-		printf("Diff %ld (%ld)\n\n", ct, sz);
-	}
-
-
-	void allocate(size_t sz)
-	{
-		allocSize += sz;
-		++allocCount;
-	}
-	void deallocate(size_t sz)
-	{
-		deallocSize += sz;
-		++deallocCount;
-	}
-};
-
-constexpr size_t max_cached_size = 256; // # of pages
-constexpr size_t single_page_cache_size = 4;
-constexpr size_t multi_page_cache_size = 2;
-
-
-struct FreeChunks
-{
-//	Chunk* topChunk = nullptr;
-	std::array<ChunkList, max_cached_size+1> freeBlocks;
-
-	BlockStats stats;
-	//uintptr_t blocksBegin = 0;
-	//uintptr_t uninitializedBlocksBegin = 0;
-	//uintptr_t blocksEnd = 0;
-	uint8_t blockSizeExp = 0;
-
-public:
-
-	void initialize(uint8_t blockSizeExp)
-	{
-		this->blockSizeExp = blockSizeExp;
-	}
-
-	Chunk* getFreeBlock(size_t sz)
-	{
-		assert(isAlignedExp(sz, blockSizeExp));
-
-		size_t ix = (sz >> blockSizeExp)-1;
-		if (ix < max_cached_size)
-		{
-			if (!freeBlocks[ix].empty())
-			{
-				Chunk* chk = static_cast<Chunk*>(freeBlocks[ix].popFront());
-				chk->initialize(sz, ix);
-//				assert(chk->isFree());
-//				chk->setInUse();
-				return chk;
-			}
-		}
-
-		void* ptr = VirtualMemory::allocate(sz);
-		stats.allocate(sz);
-		if (ptr)
-		{
-			Chunk* chk = static_cast<Chunk*>(ptr);
-			chk->initialize(sz, ix);
-			return chk;
-		}
-		//todo enlarge top chunk
-
-		throw std::bad_alloc();
-	}
-
-
-	void freeChunk(Chunk* chk)
-	{
-		assert(!chk->isFree());
-		assert(!chk->isInList());
-
-		size_t ix = chk->getSizeIndex();
-		if ( ix == 0 ) // quite likely case (all bucket chunks)
-		{
-			if ( freeBlocks[ix].getCount() < single_page_cache_size )
-			{
-				chk->setFree();
-				freeBlocks[ix].pushFront(chk);
-				return;
-			}
-		}
-		else if ( ix < max_cached_size && freeBlocks[ix].getCount() < multi_page_cache_size )
-		{
-			chk->setFree();
-			freeBlocks[ix].pushFront(chk);
-			return;
-		}
-
-		stats.deallocate(chk->getSize());
-		VirtualMemory::deallocate(chk, chk->getSize());
-	}
-
-	void printStats()
-	{
-		stats.printStats();
-	}
+	MemoryBlockList partials;
+	MemoryBlockList fulls;
+	MemoryBlockList emptys;
 };
 
 
@@ -855,7 +476,7 @@ struct HeapManager
 	std::array<void*, 32> userPtrs;
 
 	std::array<UsedBlockLists, BS::ArrSize> bucketBlocks;
-	ChunkList usedNonBuckets;
+	MemoryBlockList usedNonBuckets;
 	BS bs;
 
 	bool delayedDeallocate = false;
@@ -904,7 +525,7 @@ struct HeapManager
 	template<class BUCKET>
 	NOINLINE void* allocate3WhenNoChunkReady(UsedBlockLists& bl, uint8_t index)
 	{
-		Chunk* chk = freeChunks.getFreeBlock(blockSize);//alloc bucket;
+		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(blockSize) );//alloc bucket;
 
 		BUCKET* bb = makeBucketBlock<BUCKET>(chk, index);
 
@@ -961,7 +582,7 @@ struct HeapManager
 	NOINLINE void* allocate2ForLargeSize(size_t sz)
 	{
 		size_t chkSz = alignUpExp(sz + CHUNK_OVERHEAD, blockSizeExp);
-		Chunk* chk = freeChunks.getFreeBlock(chkSz);//alloc bucket;
+		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(chkSz) );//alloc bucket;
 		chk->setBucketKind(Chunk::NoBucket);
 
 		usedNonBuckets.pushFront(chk);
@@ -1069,6 +690,8 @@ struct HeapManager
 		}
 	}
 
+	const BlockStats& getStats() const { return freeChunks.getStats(); }
+
 	void printStats()
 	{
 		printf("----------------------\n");
@@ -1121,7 +744,7 @@ struct HeapManager
 };
 
 //typedef BigBlockBase<BucketSizes, ChunkSizes> BigBlock;
-typedef HeapManager<BucketSizes2, FreeChunks> Heap;
+typedef HeapManager<BucketSizes2, PageAllocatorWithCaching> Heap;
 //typedef BigBlockBase<BucketSizes2, ChunkSizes> BigBlock;
 
 class SerializableAllocatorBase
@@ -1170,6 +793,8 @@ public:
 				std::free(ptr);
 		}
 	}
+	
+	const BlockStats& getStats() const { return heap->getStats(); }
 	
 	void printStats()
 	{
@@ -1222,21 +847,6 @@ public:
 	
 	/* OS specific */
 //	void deserialize(const std::string& fileName);//TODO
-};
-
-
-class InfraToAutomScope
-{
-public:
-	InfraToAutomScope() {g_AllocManager.enable();}
-	~InfraToAutomScope() {g_AllocManager.disable();}
-};
-
-class AutomToInfraScope
-{
-public:
-	AutomToInfraScope() {g_AllocManager.disable();}
-	~AutomToInfraScope() {g_AllocManager.enable();}
 };
 
 #endif //SERIALIZABLE_ALLOCATOR_H

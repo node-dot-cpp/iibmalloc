@@ -20,11 +20,26 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\bucket_allocator.h" />
+    <ClInclude Include="..\src\bucket_allocator_common.h" />
+    <ClInclude Include="..\src\page_allocator.h" />
     <ClInclude Include="..\src\random_test.h" />
     <ClInclude Include="..\src\test_common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\bucket_allocator_linux.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\src\bucket_allocator_windows.cpp" />
+    <ClCompile Include="..\src\page_allocator_linux.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\page_allocator_windows.cpp" />
     <ClCompile Include="..\src\random_test.cpp" />
     <ClCompile Include="..\src\test_common.cpp" />
   </ItemGroup>

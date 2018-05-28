@@ -66,13 +66,6 @@ size_t VirtualMemory::getAllocGranularity()
 	return getPageSize();
 }
 
-size_t commitCtr = 0;
-size_t decommitCtr = 0;
-size_t commitSz = 0;
-size_t decommitSz = 0;
-size_t nowAllocated = 0;
-size_t maxAllocated = 0;
-
 
 /*static*/
 uint8_t* VirtualMemory::reserve(void* addr, size_t size)
@@ -98,9 +91,6 @@ void* VirtualMemory::allocate(size_t size)
 	if (!ptr)
 		throw std::bad_alloc();
 
-	++commitCtr;
-	commitSz += size;
-
 	return ptr;
 }
 
@@ -109,9 +99,6 @@ void VirtualMemory::deallocate(void* ptr, size_t size)
 	assert( size == 4096 );
 	int ret = munmap(ptr, size);
 	assert( ret == 0 );
-
-	decommitSz += size;
-	++decommitCtr;
 }
 
 

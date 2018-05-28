@@ -1920,12 +1920,6 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 	params.startupParams.allocatorType = allocatorType; // restore
 }
 
-extern size_t commitCtr;
-extern size_t decommitCtr;
-extern size_t commitSz;
-extern size_t decommitSz;
-extern size_t maxAllocated;
-
 /*#include <x86intrin.h>
 inline unsigned long long getRdtsc(void)
 {
@@ -1977,7 +1971,7 @@ int main()
 
 		size_t threadCountMax = 23;
 
-		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
+		for ( params.startupParams.threadCount=23; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{
 			params.startupParams.maxItems = (1 << 24) / params.startupParams.threadCount;
 			params.testRes = testRes + params.startupParams.threadCount;
@@ -2148,8 +2142,6 @@ int main()
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			printf( "%zd,%zd,%zd,%zd,%f\n", params.startupParams.threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
 	}
-
-	printf( "commitCtr = %zd (%zd bytes), decommitCtr = %zd (%zd bytes), difference: %d (%d), maxAllocated = %zd\n", commitCtr, commitSz, decommitCtr, decommitSz, int(commitCtr - decommitCtr), int(commitSz - decommitSz), maxAllocated );
 
 	return 0;
 }

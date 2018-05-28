@@ -71,13 +71,6 @@ size_t VirtualMemory::getAllocGranularity()
 	return static_cast<size_t>(siSysInfo.dwAllocationGranularity);
 }
 
-size_t commitCtr = 0;
-size_t decommitCtr = 0;
-size_t commitSz = 0;
-size_t decommitSz = 0;
-size_t nowAllocated = 0;
-size_t maxAllocated = 0;
-
 /*static*/
 uint8_t* VirtualMemory::reserve(void* addr, size_t size)
 {
@@ -85,14 +78,10 @@ uint8_t* VirtualMemory::reserve(void* addr, size_t size)
 
 	if (!addr)
 	{
-		++commitCtr;
-		commitSz += size;
 		allocLog("VirtualMemory::reserve %zd 0x%x", (size_t)(ptr), size);
 	}
 	else if (addr == ptr)
 	{
-		++commitCtr;
-		commitSz += size;
 		allocLog("VirtualMemory::reserve %zd 0x%x", (size_t)(ptr), size);
 	}
 	else
@@ -121,13 +110,8 @@ uint8_t* VirtualMemory::reserve(void* addr, size_t size)
 void VirtualMemory::commit(uintptr_t addr, size_t size)
 {
 	void* ptr = VirtualAlloc(reinterpret_cast<void*>(addr), size, MEM_COMMIT, PAGE_READWRITE);
-	++commitCtr;
-	commitSz += size;
 	assert(ptr);
 //	printf( "  allocating %zd\n", size );
-	nowAllocated += size;
-	if ( maxAllocated < nowAllocated )
-		maxAllocated = nowAllocated;
 }
 
 /*static*/
@@ -135,14 +119,7 @@ void VirtualMemory::decommit(uintptr_t addr, size_t size)
 {
 	BOOL r = VirtualFree(reinterpret_cast<void*>(addr), size, MEM_DECOMMIT);
 	assert(r);
-	decommitSz += size;
-	++decommitCtr;
 //	printf( "deallocating                     %zd\n", size );
-	if ( size < 0x10000000 ) // excluding 1GB of initial allocation
-	{
-//		assert( nowAllocated >= size );
-		nowAllocated -= size;
-	}
 }
 
 void* VirtualMemory::allocate(size_t size)
@@ -150,9 +127,6 @@ void* VirtualMemory::allocate(size_t size)
 	void* ptr = VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!ptr)
 		throw std::bad_alloc();
-
-	++commitCtr;
-	commitSz += size;
 
 	return ptr;
 }
@@ -162,7 +136,5 @@ void VirtualMemory::deallocate(void* ptr, size_t size)
 	bool OK = VirtualFree(ptr, 0, MEM_RELEASE);
 //	bool OK = VirtualFree(ptr, size, MEM_RELEASE);
 	assert( OK );
-	decommitSz += size;
-	++decommitCtr;
 }
 

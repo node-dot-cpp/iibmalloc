@@ -131,6 +131,19 @@ public:
 	
 	static constexpr BucketKinds Kind = SmallBucket;
 
+	static
+		std::pair<size_t, size_t> calculateBucketsBegin(size_t blockSize, size_t bucketSize, uint8_t firstBucketAlignmentExp)
+	{
+		size_t headerSize = sizeof(BucketBlockV2);
+		size_t begin = alignUpExp(headerSize, firstBucketAlignmentExp);
+		ptrdiff_t usableSize = blockSize - begin;
+		assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketsSize[i]);
+		//integral math
+		size_t count = usableSize / bucketSize;
+
+		return std::make_pair(begin, count);
+	}
+
 
 	bool isFull() const { return freeBuckets == 0; }
 	bool isEmpty() const { return freeBuckets == totalBuckets; }
@@ -362,12 +375,9 @@ public:
 			bucketsSize[i] = indexToBucketSize(i);
 			if (bucketsSize[i] <= MaxSmallBucketSize)
 			{
-				size_t headerSize = sizeof(SmallBucketBlock);
-				bucketsBegin[i] = alignUpExp(headerSize, firstBucketAlignmentExp);
-				ptrdiff_t usableSize = blockSize - bucketsBegin[i];
-				assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketsSize[i]);
-				//integral math
-				bucketsCount[i] = usableSize / bucketsSize[i];
+				auto begin = SmallBucketBlock::calculateBucketsBegin(blockSize, bucketsSize[i], firstBucketAlignmentExp);
+				bucketsBegin[i] = begin.first;
+				bucketsCount[i] = begin.second;
 			}
 			else
 			{
@@ -775,7 +785,7 @@ struct HeapManager
 };
 
 //typedef HeapManager<BucketSizes2, PageAllocator> Heap;
-typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorMap> Heap;
+typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorHashMap> Heap;
 
 class SerializableAllocatorBase
 {

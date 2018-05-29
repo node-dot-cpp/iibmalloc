@@ -127,7 +127,6 @@ inline constexpr
 uintptr_t alignUpExp(uintptr_t sz, uintptr_t alignmentExp)
 {
 	return ( ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)sz))))) >> alignmentExp ))) << alignmentExp);
-//    return( -((-sz) >> alignmentExp ) << alignmentExp);
 }
 
 

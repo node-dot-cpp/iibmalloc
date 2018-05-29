@@ -120,10 +120,10 @@ struct BucketBlockV2 : Chunk
 private:
 	size_t bucketSize = 0;
 	uint8_t bucketSizeIndex = 0;
-	size_t bucketsBegin = 0;
+	size_t bucketsBegin = 0; // dbg only
 
 	size_t totalBuckets = 0;
-	size_t freeBuckets = 0;
+	size_t freeBuckets = 0; // could be eliminated in production
 	
 	size_t freeBucketList = 0;
 public:
@@ -188,6 +188,84 @@ public:
 	}
 };
 
+
+struct BucketBlockV2_2 : Chunk
+{
+private:
+	uint16_t bucketSize = 0;
+	uint8_t bucketSizeIndex = 0;
+	uint16_t usedBucketCount = 0;
+	uint32_t freeBucketList = 0;
+
+
+//	size_t bucketsBegin = 0; // dbg only
+//	size_t totalBuckets = 0;
+//	size_t freeBuckets = 0; // could be eliminated in production
+	
+public:
+	
+	static constexpr BucketKinds Kind = SmallBucket;
+
+
+	bool isFull() const { return freeBucketList == 0; }
+	bool isEmpty() const { return usedBucketCount == 0; }
+
+	size_t getBucketSize() const { return bucketSize; }
+	uint8_t getBucketSizeIndex() const { return bucketSizeIndex; }
+
+	FORCE_INLINE
+	void initialize(size_t bucketSize, uint8_t bckSzIndex, size_t bucketsBegin, size_t bucketsCount)
+	{
+		uint8_t* begin = reinterpret_cast<uint8_t*>(this);
+		this->setBucketKind(Kind);
+
+		assert(bucketSize >= sizeof(void*));
+		this->bucketSize = bucketSize;
+		this->bucketSizeIndex = bckSzIndex;
+		this->usedBucketCount = 0;
+//		this->bucketsBegin = bucketsBegin;
+
+//		this->totalBuckets = bucketsCount;
+//		this->freeBuckets = totalBuckets;
+
+		// free list initialization
+		this->freeBucketList = bucketsBegin;
+		
+		size_t bucketsEnd = bucketsBegin + bucketsCount * bucketSize;
+
+		for (size_t i = bucketsBegin; i<(bucketsEnd - bucketSize); i += bucketSize)
+			*reinterpret_cast<uint32_t*>(begin + i) = i + bucketSize;
+
+		*reinterpret_cast<uint32_t*>(begin + bucketsEnd - bucketSize) = 0;
+		assert(freeBucketList < bucketsBegin + bucketsCount * bucketSize);
+	}
+
+	FORCE_INLINE void* allocate()
+	{
+		assert(freeBucketList != 0);
+//		--freeBuckets;
+		++usedBucketCount;
+		uint8_t* begin = reinterpret_cast<uint8_t*>(this);
+		size_t tmp = freeBucketList;
+//		assert( freeBucketList < bucketsBegin + totalBuckets * bucketSize );
+		freeBucketList = *reinterpret_cast<uint32_t*>(begin + freeBucketList);
+//		assert( freeBucketList < bucketsBegin + totalBuckets * bucketSize || freeBuckets == 0 );
+		return begin + tmp;
+	}
+	FORCE_INLINE void release(void* ptr)
+	{
+//		assert(freeBuckets != totalBuckets);
+		uint8_t* begin = reinterpret_cast<uint8_t*>(this);
+		assert( begin < ptr );
+//		assert( ptr < begin + bucketsBegin + totalBuckets * bucketSize );
+//		assert( freeBucketList < bucketsBegin + totalBuckets * bucketSize || freeBuckets == 0 );
+//		++freeBuckets;
+		--usedBucketCount;
+		*reinterpret_cast<uint32_t*>(ptr) = freeBucketList;
+		freeBucketList = (uint32_t)( reinterpret_cast<uint8_t*>(ptr) - begin );
+//		assert( freeBucketList < bucketsBegin + totalBuckets * bucketSize );
+	}
+};
 
 template<uint8_t SIZE_EXP>
 struct BucketBlockV4 : Chunk
@@ -335,7 +413,8 @@ constexpr size_t CHUNK_OVERHEAD = alignUpExp(sizeof(Chunk), FIRST_BUCKET_ALIGNME
 
 static constexpr size_t MAX_SMALL_BUCKET_SIZE = 32;
 
-typedef BucketBlockV2 SmallBucketBlock;
+//typedef BucketBlockV2 SmallBucketBlock;
+typedef BucketBlockV2_2 SmallBucketBlock;
 typedef BucketBlockV4<sizeToExp(MAX_SMALL_BUCKET_SIZE) + 1> MediumBucketBlock;
 
 
@@ -452,20 +531,20 @@ public:
 			assert(indexToBucketSize(sizeToIndex(i)) >= i);
 	}
 };
-
+/*
 struct UsedBlockLists
 {
 	MemoryBlockList partials;
 	MemoryBlockList fulls;
 	MemoryBlockList emptys;
-};
+};*/
 
 
 
 template<class BS, class CM>
 struct HeapManager
 {
-	uint64_t magic = SerializableAllocatorMagic.asUint;
+//	uint64_t magic = SerializableAllocatorMagic.asUint;
 	//uintptr_t begin = 0;
 	//uintptr_t end = 0;
 	//size_t reservedSize = 0;
@@ -477,9 +556,13 @@ struct HeapManager
 	size_t alignmentMask = ALIGNMENT_MASK;
 	uint8_t firstBucketAlignmentExp = FIRST_BUCKET_ALIGNMENT_EXP;
 
-	std::array<void*, 32> userPtrs;
+//	std::array<void*, 32> userPtrs;
 
-	std::array<UsedBlockLists, BS::ArrSize> bucketBlocks;
+//	std::array<UsedBlockLists, BS::ArrSize> bucketBlocks;
+	std::array<MemoryBlockList, BS::ArrSize> partials;
+	std::array<MemoryBlockList, BS::ArrSize> fulls;
+	std::array<MemoryBlockList, BS::ArrSize> emptys;
+
 	MemoryBlockList usedNonBuckets;
 	BS bs;
 
@@ -493,7 +576,7 @@ struct HeapManager
 	HeapManager()
 	{
 		pendingDeallocates.fill(nullptr);
-		userPtrs.fill(nullptr);
+//		userPtrs.fill(nullptr);
 	}
 
 
@@ -527,7 +610,7 @@ struct HeapManager
 
 	
 	template<class BUCKET>
-	NOINLINE void* allocate3WhenNoChunkReady(UsedBlockLists& bl, uint8_t index)
+	NOINLINE void* allocate3WhenNoChunkReady( uint8_t index )
 	{
 		Chunk* chk = reinterpret_cast<Chunk*>( freeChunks.getFreeBlock(blockSize) );//alloc bucket;
 
@@ -536,35 +619,27 @@ struct HeapManager
 		void* ptr = bb->allocate();
 
 		assert(!bb->isFull());
-		bl.partials.pushFront(bb);
+		partials[index].pushFront(bb);
 
 		return ptr;
 	}
 
+	template<class BUCKET>
+	NOINLINE void moveFromPartialsToFulls( BUCKET* bb, uint8_t index )
+	{
+		partials[index].remove(bb);
+		fulls[index].pushFront(bb);
+	}
+
 
 	template<class BUCKET>
-	FORCE_INLINE
-	void* allocate3(UsedBlockLists& bl, uint8_t index)
+	NOINLINE
+	void* allocate3UnlikelyCases( uint8_t index )
 	{
-		if (!bl.partials.empty())
+		assert(partials[index].empty()); // likely case
+		if (!emptys[index].empty())
 		{
-			Chunk* chk = static_cast<Chunk*>(bl.partials.front());
-			BUCKET* bb = static_cast<BUCKET*>(chk);
-			assert(chk->getBucketKind() == BUCKET::Kind);
-			//assert(sz <= bb->getBucketSize());
-			void* ptr = bb->allocate();
-
-			if (!bb->isFull()) // likely
-				return ptr;
-
-			bl.partials.remove(bb);
-			bl.fulls.pushFront(bb);
-
-			return ptr;
-		}
-		else if (!bl.emptys.empty())
-		{
-			Chunk* chk = static_cast<Chunk*>(bl.emptys.front());
+			Chunk* chk = static_cast<Chunk*>(emptys[index].front());
 			assert(chk->getBucketKind() == BUCKET::Kind);
 			BUCKET* bb = static_cast<BUCKET*>(chk);
 			//assert(sz <= bb->getBucketSize());
@@ -572,15 +647,62 @@ struct HeapManager
 
 			assert(!bb->isFull());
 
-			bl.emptys.remove(bb);
-			bl.partials.pushFront(bb);
+			emptys[index].remove(bb);
+			partials[index].pushFront(bb);
 
 			return ptr;
 		}
 		else
 		{
-			return allocate3WhenNoChunkReady<BUCKET>( bl, index );
+			return allocate3WhenNoChunkReady<BUCKET>( index );
 		}
+	}
+
+	template<class BUCKET>
+	FORCE_INLINE
+	void* allocate3( uint8_t index )
+	{
+		if (!partials[index].empty())
+		{
+			Chunk* chk = static_cast<Chunk*>(partials[index].front());
+			BUCKET* bb = static_cast<BUCKET*>(chk);
+			assert(chk->getBucketKind() == BUCKET::Kind);
+			//assert(sz <= bb->getBucketSize());
+			void* ptr = bb->allocate();
+
+			if (!bb->isFull()) // likely
+				return ptr;
+			else
+			{
+				moveFromPartialsToFulls( bb, index );
+				return ptr;
+			}
+
+//			partials[index].remove(bb);
+//			fulls[index].pushFront(bb);
+
+		}
+		else
+			return allocate3UnlikelyCases<BUCKET>( index );
+/*		else if (!emptys[index].empty())
+		{
+			Chunk* chk = static_cast<Chunk*>(emptys[index].front());
+			assert(chk->getBucketKind() == BUCKET::Kind);
+			BUCKET* bb = static_cast<BUCKET*>(chk);
+			//assert(sz <= bb->getBucketSize());
+			void* ptr = bb->allocate();
+
+			assert(!bb->isFull());
+
+			emptys[index].remove(bb);
+			partials[index].pushFront(bb);
+
+			return ptr;
+		}
+		else
+		{
+			return allocate3WhenNoChunkReady<BUCKET>( index );
+		}*/
 	}
 
 	NOINLINE void* allocate2ForLargeSize(size_t sz)
@@ -598,14 +720,14 @@ struct HeapManager
 		if (sz <= BS::MaxSmallBucketSize)
 		{
 			uint8_t ix = BS::sizeToIndex(sz);
-			assert(ix < bucketBlocks.size());
-			return allocate3<SmallBucketBlock>(bucketBlocks[ix], ix);
+//			assert(ix < bucketBlocks.size());
+			return allocate3<SmallBucketBlock>(ix);
 		}
 		else if (sz <= BS::MaxBucketSize)
 		{
 			uint8_t ix = BS::sizeToIndex(sz);
-			assert(ix < bucketBlocks.size());
-			return allocate3<MediumBucketBlock>(bucketBlocks[ix], ix);
+//			assert(ix < bucketBlocks.size());
+			return allocate3<MediumBucketBlock>(ix);
 		}
 		else
 		{
@@ -641,14 +763,14 @@ struct HeapManager
 		{
 			assert(!bb->isEmpty());
 
-			bucketBlocks[ix].fulls.remove(bb);
-			bucketBlocks[ix].partials.pushFront(bb);
+			fulls[ix].remove(bb);
+			partials[ix].pushFront(bb);
 		}
 		else if (isEmpty)
 		{
-			bucketBlocks[ix].partials.remove(bb);
-			if(bucketBlocks[ix].emptys.size() < KEEP_EMPTY_BUCKETS)
-				bucketBlocks[ix].emptys.pushFront(bb);
+			partials[ix].remove(bb);
+			if(emptys[ix].size() < KEEP_EMPTY_BUCKETS)
+				emptys[ix].pushFront(bb);
 			else
 				freeChunks.freeChunk(bb); //may merge
 		}
@@ -703,26 +825,25 @@ struct HeapManager
 		freeChunks.printStats();
 
 		printf("\nBucketBlocks lists:\n");
-		for (uint8_t i = 0; i != bucketBlocks.size(); ++i)
+/*		for (uint8_t i = 0; i != bucketBlocks.size(); ++i)
 		{
-			auto& c = bucketBlocks[i];
-			if (!c.fulls.empty() || !c.partials.empty() || !c.emptys.empty())
+			if (!fulls.empty() || !partials.empty() || !emptys.empty())
 			{
 				printf("[ %u ]  %u / %u / %u\n", 
 					static_cast<unsigned>(bs.bucketsSize[i]),
-					static_cast<unsigned>(c.fulls.size()),
-					static_cast<unsigned>(c.partials.size()),
-					static_cast<unsigned>(c.emptys.size()));
+					static_cast<unsigned>(fulls[i].size()),
+					static_cast<unsigned>(partials[i].size()),
+					static_cast<unsigned>(emptys[i].size()));
 			}
-		}
+		}*/
 		printf("\nNonBuckets chunks:\n");
 		if(!usedNonBuckets.empty())
 			printf("      %u\n", static_cast<unsigned>(usedNonBuckets.size()));
 		printf("----------------------\n");
 	}
 
-	void setUserPtr(size_t ix, void* ptr) { userPtrs.at(ix) = ptr; }
-	void* getUserPtr(size_t ix) const { return userPtrs.at(ix); }
+//	void setUserPtr(size_t ix, void* ptr) { userPtrs.at(ix) = ptr; }
+//	void* getUserPtr(size_t ix) const { return userPtrs.at(ix); }
 
 	//size_t getReservedSize() const { return reservedSize; }
 	//size_t getUsedSize() const
@@ -754,7 +875,8 @@ typedef HeapManager<BucketSizes2, PageAllocatorWithCaching> Heap;
 class SerializableAllocatorBase
 {
 protected:
-	Heap* heap = nullptr;
+//	Heap* heap = nullptr;
+	Heap heap;
 	size_t heapSz = 0;
 	bool isEnabled = false;
 	
@@ -768,13 +890,13 @@ public:
 	void enable() {assert(!isEnabled); isEnabled = true;}
 	void disable() {assert(isEnabled); isEnabled = false;}
 	
-	void enableDelayedDeallocate() { heap->enableDelayedDeallocate(); }
-	void flushDelayedDeallocate() { heap->flushDelayedDeallocate(); }
+//	void enableDelayedDeallocate() { heap->enableDelayedDeallocate(); }
+//	void flushDelayedDeallocate() { heap->flushDelayedDeallocate(); }
 
 
 	FORCE_INLINE void* allocate(size_t sz)
 	{
-		if (heap && isEnabled)
+/*		if (heap && isEnabled)
 			return heap->allocate(sz);
 		else
 		{
@@ -784,30 +906,34 @@ public:
 				return ptr;
 			else
 				throw std::bad_alloc();
-		}
+		}*/
+		return heap.allocate(sz);
 	}
 
 	FORCE_INLINE void deallocate(void* ptr)
 	{
 		if(ptr)
 		{
-			if (heap && isEnabled)
+/*			if (heap && isEnabled)
 				heap->deallocate(ptr);
 			else
-				std::free(ptr);
+				std::free(ptr);*/
+			heap.deallocate(ptr);
 		}
 	}
 	
-	const BlockStats& getStats() const { return heap->getStats(); }
+//	const BlockStats& getStats() const { return heap->getStats(); }
+	const BlockStats& getStats() const { return heap.getStats(); }
 	
 	void printStats()
 	{
-		assert(heap);
-		heap->printStats();
+//		assert(heap);
+//		heap->printStats();
+		heap.printStats();
 	}
 
-	void setUserPtr(size_t ix, void* ptr) { heap->setUserPtr(ix, ptr); }
-	void* getUserPtr(size_t ix) const { return heap->getUserPtr(ix); }
+//	void setUserPtr(size_t ix, void* ptr) { heap->setUserPtr(ix, ptr); }
+//	void* getUserPtr(size_t ix) const { return heap->getUserPtr(ix); }
 
 	//void setUserRootPtr(void* ptr) { heap->setUserPtr(0, ptr); }
 	//void* getDeserializedUserRootPtr() const { return heap->getUserPtr(0); }
@@ -828,24 +954,27 @@ public:
 
 	void initialize()
 	{
-		assert(!heap);
+		printf( "sizeof(Heap): %zd\n", sizeof(Heap));
+		printf( "sizeof(BucketBlockV2_2): %zd\n", sizeof(BucketBlockV2_2));
+//		assert(!heap);
 		
 		size_t ps = VirtualMemory::getPageSize();
 		uint8_t pageSizeExp = sizeToExp(ps);
 		heapSz = alignUpExp(sizeof(Heap), pageSizeExp);
 
 		
-		void* ptr = VirtualMemory::allocate(heapSz);
+//		void* ptr = VirtualMemory::allocate(heapSz);
 
 
-		heap = new(ptr) Heap();
-		heap->initialize();
+//		heap = new(ptr) Heap();
+//		heap->initialize();
+		heap.initialize();
 	}
 
 	~SerializableAllocatorBase()
 	{
-		if(heap)
-			VirtualMemory::deallocate(heap, heapSz);
+//		if(heap)
+//			VirtualMemory::deallocate(heap, heapSz);
 	}
 	
 	

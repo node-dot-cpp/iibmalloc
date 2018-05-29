@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="..\src\bucket_allocator.h" />
     <ClInclude Include="..\src\bucket_allocator_common.h" />
+    <ClInclude Include="..\src\bucket_allocator_keeping_pages.h" />
     <ClInclude Include="..\src\page_allocator.h" />
     <ClInclude Include="..\src\random_test.h" />
     <ClInclude Include="..\src\test_common.h" />

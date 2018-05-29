@@ -26,10 +26,8 @@
  * -------------------------------------------------------------------------------
  * 
  * Per-thread bucket allocator
- * Page Allocator: 
- *     - returns a requested number of allocated (or previously cached) pages
- *     - accepts a pointer to pages to be deallocated (pointer to and number of
- *       pages must be that from one of requests for allocation)
+ * Page Allocator with map: 
+ *     - same functional interface than Page Allocator
  * 
  * v.1.00    May-09-2018    Initial release
  * 
@@ -186,82 +184,6 @@ public:
 
 
 
-template<uint8_t SIZE_EXP>
-struct SimplifiedBucketBlock : ListItem
-{
-private:
-	uint16_t totalBuckets = 0;
-	uint16_t freeBucketListNext = 0;
-
-	//this must be last member
-	//size is not really 1, real size is determined at initialization
-	uint16_t freeBucketList[1];
-
-public:
-	bool isFull() const { return freeBucketListNext == totalBuckets; }
-	bool isEmpty() const { return freeBucketListNext == 0; }
-
-	static
-		std::pair<size_t, size_t> calculateBucketsBegin(size_t blockSize, size_t bucketSize)
-	{
-		size_t sz1 = blockSize - sizeof(BucketBlockV4<1>);
-
-		size_t estCount = sz1 / (bucketSize + sizeof(uint16_t));
-
-		sz1 -= estCount * sizeof(uint16_t);
-
-		size_t realCount = sz1 / bucketSize;
-
-		assert(realCount < UINT16_MAX);
-
-		size_t begin = blockSize - (realCount * bucketSize);
-
-		assert(sizeof(BucketBlockV4<1>) + realCount * sizeof(uint16_t) <= begin);
-
-		return std::make_pair(begin, realCount);
-	}
-
-	void initialize(size_t bucketSize, size_t bucketsBegin, size_t bucketsCount)
-	{
-		assert(bucketSize >= sizeof(void*));
-		assert(isAlignedExp(bucketsBegin, SIZE_EXP));
-		assert(isAlignedExp(bucketSize, SIZE_EXP));
-
-		this->totalBuckets = bucketsCount;
-
-		freeBucketListNext = 0;
-		// free list initialization
-
-
-		uint16_t bkt = bucketsBegin >> SIZE_EXP;
-		for (uint16_t i = 0; i < totalBuckets; ++i)
-		{
-			freeBucketList[i] = bkt;
-			bkt += (bucketSize >> SIZE_EXP);
-		}
-	}
-
-	FORCE_INLINE void* allocate()
-	{
-		assert(!isFull());
-
-		uintptr_t begin = reinterpret_cast<uintptr_t>(this);
-
-		uint16_t bucketNumber = freeBucketList[freeBucketListNext++];
-		return reinterpret_cast<void*>(begin | (bucketNumber << SIZE_EXP));
-	}
-	FORCE_INLINE void release(void* ptr)
-	{
-		assert(!isEmpty());
-
-		uintptr_t begin = reinterpret_cast<uintptr_t>(this);
-		size_t bucketNumber = (reinterpret_cast<uintptr_t>(ptr) - begin) >> SIZE_EXP;
-		assert(bucketNumber < UINT16_MAX);
-
-		freeBucketList[--freeBucketListNext] = static_cast<uint16_t>(bucketNumber);
-	}
-};
-
 struct SimplifiedBucketBlock2 : ListItem
 {
 private:
@@ -347,7 +269,7 @@ public:
 	}
 };
 
-
+constexpr size_t AlignmentOfFirstBucket = 64;
 
 template<size_t SZ>
 struct SimplifiedBucketAllocator
@@ -370,7 +292,7 @@ struct SimplifiedBucketAllocator
 		blockSizeExp = blkSzExp;
 		blockSize = expToSize(blkSzExp);
 
-		auto begin = BucketBlock::calculateBucketsBegin(blockSize, bktSz, sizeToExp(64));
+		auto begin = BucketBlock::calculateBucketsBegin(blockSize, bktSz, sizeToExp(AlignmentOfFirstBucket));
 		bktBegin = begin.first;
 		bktCount = begin.second;
 
@@ -474,48 +396,6 @@ struct SimplifiedBucketAllocator
 	}
 };
 
-constexpr size_t SimplifiedBucketSize = 64;
-typedef SimplifiedBucketAllocator<SimplifiedBucketSize> SimplifiedBucketAllocator64;
-
-template<class T>
-struct ContainerAllocator
-{
-	static_assert(sizeof(T) <= SimplifiedBucketSize, "Please increase SimplifiedBucketSize!");
-
-	SimplifiedBucketAllocator64 * bucketAlloc;
-	typedef T value_type;
-	ContainerAllocator(SimplifiedBucketAllocator64* bucketAlloc) : bucketAlloc(bucketAlloc) {}
-
-	ContainerAllocator(const ContainerAllocator&) = default;
-	ContainerAllocator(ContainerAllocator&&) = default;
-
-	ContainerAllocator& operator=(const ContainerAllocator&) = default;
-	ContainerAllocator& operator=(ContainerAllocator&&) = default;
-
-	template<class U>
-	ContainerAllocator(const ContainerAllocator<U>& other) : ContainerAllocator(other.bucketAlloc) { }
-
-	template<class U>
-	ContainerAllocator(ContainerAllocator<U>&& other) : ContainerAllocator(other.bucketAlloc) { }
-
-	T* allocate(size_t n)
-	{
-		assert(bucketAlloc);
-		assert(n == 1);
-		return static_cast<T*>(bucketAlloc->allocate());
-	}
-
-	void deallocate(T* ptr, size_t)
-	{
-		assert(bucketAlloc);
-		bucketAlloc->deallocate(ptr);
-	}
-
-	bool operator==(const ContainerAllocator& other) const { return realAlloc == other.bucketAlloc; }
-	bool operator!=(const ContainerAllocator& other) const { return !(this->operator==(other)); }
-
-};
-
 
 struct PageDescriptor : public ListItem
 {
@@ -534,239 +414,50 @@ struct PageDescriptor : public ListItem
 	size_t getSize() const { return kiloToSize(kiloSz); }
 	void* toPtr() const { return address; }
 
-
-	bool operator<(const PageDescriptor& other) const { return this->address < other.address; }
 	bool operator==(const PageDescriptor& other) const { return this->address == other.address; }
 };
 
 
-struct PageDescriptorMap
-{
-	typedef std::set<PageDescriptor, std::less<PageDescriptor>,
-		ContainerAllocator<PageDescriptor>> Container;
-	SimplifiedBucketAllocator64 buckets;
-	static_assert(sizeof(Container) <= 64, "Please increase bucket size!");
-
-	std::chrono::nanoseconds timeAccum;
-
-	Container* descriptors = nullptr;
-
-	PageDescriptorMap() {}
-
-	void initialize(void* ptr, uint8_t blockSizeExp)
-	{
-		buckets.initialize(ptr, blockSizeExp);
-		void* bkt = buckets.allocate();
-		descriptors = new(bkt) Container(ContainerAllocator<PageDescriptor>(&buckets));
-	}
-
-	void insert(void* ptr, size_t sz)
-	{
-		auto res = descriptors->emplace(ptr, sz);
-		assert(res.second);
-	}
-
-	PageDescriptor* find(void* ptr)
-	{
-		auto begin_time = std::chrono::high_resolution_clock::now();
-		Container::iterator it = descriptors->find(PageDescriptor(ptr,0));
-		assert(it != descriptors->end());
-
-		auto diff = std::chrono::high_resolution_clock::now() - begin_time;
-		timeAccum += diff;
-
-
-		//mb: const_cast is safe here, because key elements are inmutable in PageDescriptor
-		return const_cast<PageDescriptor*>(&(*it));
-	}
-
-	void erase(PageDescriptor* pd)
-	{
-		descriptors->erase(*pd);
-	}
-
-	template<class Allocator>
-	void doHouseKeeping(Allocator* alloc)
-	{
-		buckets.doHouseKeeping(alloc);
-	}
-
-	void printStats()
-	{
-		std::chrono::milliseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(timeAccum);
-		printf("Time spent on find %lld ms\n", time.count());
-	}
-};
-
-
-
-struct PageAllocatorWithDescriptorMap // to be further developed for practical purposes
-{
-	std::array<ItemList, max_cached_size+1> freeBlocks;
-	PageDescriptorMap descriptors;
-
-	BlockStats stats;
-
-	uint8_t blockSizeExp = 0;
-	size_t blockSize = 0;
-
-public:
-
-	PageAllocatorWithDescriptorMap() {}
-
-	void initialize(uint8_t blkSzExp)
-	{
-		assert(blkSzExp >= 10);
-
-		blockSizeExp = blkSzExp;
-		blockSize = expToSize(blockSizeExp);
-
-		void* ptr = VirtualMemory::allocate(blockSize);
-		descriptors.initialize(ptr, blockSizeExp);
-		descriptors.insert(ptr, blockSize);
-	}
-
-	FORCE_INLINE
-		size_t sizeToIndex(size_t sz)
-	{
-		assert(isAlignedExp(sz, blockSizeExp));
-		return (sz >> blockSizeExp) - 1;
-	}
-
-
-	FORCE_INLINE
-	void* getFreeBlock(size_t sz)
-	{
-
-		size_t ix = sizeToIndex(sz);
-		if (ix < max_cached_size)
-		{
-			if (!freeBlocks[ix].empty())
-			{
-				PageDescriptor* d = static_cast<PageDescriptor*>(freeBlocks[ix].popFront());
-				return d->toPtr();
-			}
-		}
-
-		void* ptr = VirtualMemory::allocate(sz);
-		stats.allocate(sz);
-		assert(ptr);
-		descriptors.insert(ptr, sz);
-
-		return ptr;
-	}
-
-	FORCE_INLINE
-		MemoryBlockListItem* getBucketBlock(size_t sz)
-	{
-		//returns a block with alignment requirements to make buckets
-		void* ptr = getFreeBlock(sz);
-		MemoryBlockListItem* item = new(ptr) MemoryBlockListItem();
-		item->initialize(0, 0);
-
-		return item;
-	}
-
-	FORCE_INLINE
-		void freeChunk( void* ptr )
-	{
-		assert(isAlignedExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
-
-		auto d = descriptors.find(ptr);
-
-		size_t sz = d->getSize();
-		size_t ix = sizeToIndex(sz);
-		if ( ix == 0 ) // quite likely case (all bucket chunks)
-		{
-			if ( freeBlocks[ix].getCount() < single_page_cache_size )
-			{
-				freeBlocks[ix].pushFront(d);
-				return;
-			}
-		}
-		else if ( ix < max_cached_size && freeBlocks[ix].getCount() < multi_page_cache_size )
-		{
-			freeBlocks[ix].pushFront(d);
-			return;
-		}
-
-		stats.deallocate(sz);
-		descriptors.erase(d);
-		
-		VirtualMemory::deallocate(ptr, sz);
-	}
-
-	void doHouseKeeping()
-	{
-		descriptors.doHouseKeeping(this);
-	}
-
-	void printStats()
-	{
-		stats.printStats();
-		descriptors.printStats();
-	}
-};
-
 /*
 	mb: we need to share PageDescriptor between hash map and cache,
 	because of that, we can't put PageDescriptors inside the hashmap,
-	we need to allocate it in simplified buckets and use list
+	we need to allocate it in simplified buckets and use lists
 */
 
 struct PageDescriptorHashMap
 {
-//	SimplifiedBucketAllocator buckets;
-
 	std::chrono::nanoseconds timeAccum;
 	uint32_t maxHashCount = 0;
 	uint32_t elemCount = 0;
 	uint32_t maxElemCount = 0;
 
 	std::hash<void*> hh;
-	uint8_t blockSizeExp;
-	uint8_t hashBucketExp;
-	size_t hashBucketMask;
+//	uint8_t blockSizeExp;
+	uint8_t hashSizeExp;
+	size_t hashSizeMask;
 	ItemList* hashMap;
 	std::array<ItemList, 1024> initialHashMap;
 
 	PageDescriptorHashMap() :
-		hashBucketExp(sizeToExp(initialHashMap.size())),
-		hashBucketMask(expToMask(hashBucketExp)),
+		hashSizeExp(sizeToExp(initialHashMap.size())),
+		hashSizeMask(expToMask(hashSizeExp)),
 		hashMap(initialHashMap.data())
 	{
 	}
 
-
-
-	void initialize(uint8_t blkSzExp)
+	void initialize()
 	{
-		blockSizeExp = blkSzExp;
+//		blockSizeExp = blkSzExp;
 	}
 
 	FORCE_INLINE
 	size_t getHash(void* ptr)
 	{
-		//size_t u = reinterpret_cast<size_t>(ptr);
-		//u >>= blockSizeExp;
 		size_t u = hh(ptr);
-		u &= hashBucketMask;
+		u &= hashSizeMask;
 
 		return u;
 	}
-
-	//void insertNew(void* ptr, size_t sz)
-	//{
-	//	size_t h = getHash(ptr);
-
-	//	void* bkt = buckets.allocate();
-	//	PageDescriptor* pd = new(bkt) PageDescriptor(ptr, sz);
-
-	//	hashMap[h].pushFront(pd);
-	//	maxHashCount = std::max(maxHashCount, hashMap[h].getCount());
-	//	++elemCount;
-	//	maxElemCount = std::max(maxElemCount, elemCount);
-	//}
 
 	void insert(PageDescriptor* pd)
 	{
@@ -807,24 +498,11 @@ struct PageDescriptorHashMap
 		return nullptr;
 	}
 
-	//void deallocate(PageDescriptor* pd)
-	//{
-	//	assert(!pd->isInList());
-	//	buckets.deallocate(pd);
-	//}
-
-	//template<class Allocator>
-	//void doHouseKeeping(Allocator* alloc)
-	//{
-	//	buckets.doHouseKeeping(alloc);
-	//}
-
 	void printStats()
 	{
 		std::chrono::milliseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(timeAccum);
 		printf("Time spent on find %lld ms, max hash count %u, max elem count %u\n", time.count(), maxHashCount, maxElemCount);
 	}
-
 };
 
 
@@ -833,7 +511,7 @@ struct PageAllocatorWithDescriptorHashMap // to be further developed for practic
 {
 	std::array<ItemList, max_cached_size + 1> freeBlocks;
 	SimplifiedBucketAllocator<32> buckets;
-	PageDescriptorHashMap descriptors;
+	PageDescriptorHashMap usedBlocks;
 	static_assert(sizeof(PageDescriptor) <= 32, "Please increase bucket size!");
 
 
@@ -855,13 +533,13 @@ public:
 
 		void* ptr = VirtualMemory::allocate(blockSize);
 		
-		descriptors.initialize(blockSizeExp);
+		usedBlocks.initialize();
 		buckets.initialize(ptr, blockSizeExp);
 
 		void* bkt = buckets.allocate();
 		PageDescriptor* pd = new(bkt) PageDescriptor(ptr, blockSize);
 
-		descriptors.insert(pd);
+		usedBlocks.insert(pd);
 	}
 
 
@@ -883,7 +561,7 @@ public:
 			if (!freeBlocks[ix].empty())
 			{
 				PageDescriptor* d = static_cast<PageDescriptor*>(freeBlocks[ix].popFront());
-				descriptors.insert(d);
+				usedBlocks.insert(d);
 				return d->toPtr();
 			}
 		}
@@ -895,7 +573,7 @@ public:
 		void* bkt = buckets.allocate();
 		PageDescriptor* pd = new(bkt) PageDescriptor(ptr, sz);
 
-		descriptors.insert(pd);
+		usedBlocks.insert(pd);
 
 		return ptr;
 	}
@@ -916,7 +594,7 @@ public:
 	{
 		assert(isAlignedExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
 
-		auto d = descriptors.findAndErase(ptr);
+		auto d = usedBlocks.findAndErase(ptr);
 
 		size_t sz = d->getSize();
 		size_t ix = sizeToIndex(sz);
@@ -951,7 +629,7 @@ public:
 	void printStats()
 	{
 		stats.printStats();
-		descriptors.printStats();
+		usedBlocks.printStats();
 	}
 };
 

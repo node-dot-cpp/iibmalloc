@@ -66,6 +66,7 @@ static_assert( ( 1 << BLOCK_SIZE_EXP ) == BLOCK_SIZE, "" );
 static_assert( 1 + BLOCK_SIZE_MASK == BLOCK_SIZE, "" );
 
 
+#define USE_ITEM_HEADER
 
 
 class SerializableAllocatorBase
@@ -81,11 +82,20 @@ protected:
 	struct ChunkHeader
 	{
 		MemoryBlockListItem block;
-		size_t idx;
 		ChunkHeader* next;
+		size_t idx;
 	};
 	
 	ChunkHeader* nextPage = nullptr;
+
+#ifdef USE_ITEM_HEADER
+	struct ItemHeader
+	{
+		uint8_t idx;
+		uint8_t reserved[7];
+	};
+	static_assert( sizeof( ItemHeader ) == 8, "" );
+#endif // USE_ITEM_HEADER
 
 protected:
 	static constexpr
@@ -166,24 +176,39 @@ public:
 		uint8_t* mem = block + memStart;
 		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
 		assert( bucketSz >= sizeof( void* ) );
+#ifdef USE_ITEM_HEADER
+		bucketSz += sizeof(ItemHeader);
+#endif // USE_ITEM_HEADER
 		size_t itemCnt = (BLOCK_SIZE - memStart) / bucketSz;
 		assert( itemCnt );
 		for ( size_t i=bucketSz; i<(itemCnt-1)*bucketSz; i+=bucketSz )
 			*reinterpret_cast<void**>(mem + i) = mem + i + bucketSz;
 		*reinterpret_cast<void**>(mem + (itemCnt-1)*bucketSz) = nullptr;
 		buckets[szidx] = mem + bucketSz;
+#ifdef USE_ITEM_HEADER
+		reinterpret_cast<ItemHeader*>( mem )->idx = szidx;
+		return mem + sizeof( ItemHeader );
+#else
 		return mem;
+#endif // USE_ITEM_HEADER
 	}
 
 	NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
 	{
+#ifdef USE_ITEM_HEADER
+		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ) + sizeof( ItemHeader ), ALIGNMENT_EXP );
+#else
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
+#endif // USE_ITEM_HEADER
 		size_t fullSz = alignUpExp( sz + memStart, BLOCK_SIZE_EXP );
 		MemoryBlockListItem* block = pageAllocator.getFreeBlock( fullSz );
 		ChunkHeader* h = reinterpret_cast<ChunkHeader*>( block );
 		h->idx = large_block_idx;
 
 //		usedNonBuckets.pushFront(chk);
+#ifdef USE_ITEM_HEADER
+		reinterpret_cast<ItemHeader*>( block + sizeof( ChunkHeader) )->idx = large_block_idx;
+#endif // USE_ITEM_HEADER
 		return reinterpret_cast<uint8_t*>(block) + memStart;
 	}
 
@@ -197,7 +222,12 @@ public:
 			{
 				void* ret = buckets[szidx];
 				buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
+#ifdef USE_ITEM_HEADER
+				reinterpret_cast<ItemHeader*>( ret )->idx = szidx;
+				return reinterpret_cast<uint8_t*>(ret) + sizeof( ItemHeader );
+#else
 				return ret;
+#endif // USE_ITEM_HEADER
 			}
 			else
 				return allocateInCaseNoFreeBucket( sz, szidx );
@@ -212,6 +242,21 @@ public:
 	{
 		if(ptr)
 		{
+#ifdef USE_ITEM_HEADER
+			ItemHeader* ih = reinterpret_cast<ItemHeader*>(ptr) - 1;
+			if ( ih->idx != large_block_idx )
+			{
+				uint8_t idx = ih->idx;
+				*reinterpret_cast<void**>( ih ) = buckets[idx];
+				buckets[idx] = ih;
+			}
+			else
+			{
+				ChunkHeader* ch = getChunkFromUsrPtr( ptr );
+				assert( reinterpret_cast<uint8_t*>(ch) == reinterpret_cast<uint8_t*>(ih) );
+				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(ch) );
+			}
+#else
 			ChunkHeader* h = getChunkFromUsrPtr( ptr );
 			if ( h->idx != large_block_idx )
 			{
@@ -220,6 +265,7 @@ public:
 			}
 			else
 				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(h) );
+#endif // USE_ITEM_HEADER
 		}
 	}
 	

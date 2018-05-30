@@ -44,12 +44,12 @@
 #endif
 
 
-uint64_t getTscCounter()
+int64_t getTscCounter()
 {
 	LARGE_INTEGER val;
 	BOOL ok = QueryPerformanceCounter(&val);
 	assert(ok);
-	return static_cast<uint64_t>(val.QuadPart);
+	return static_cast<int64_t>(val.QuadPart);
 }
 
 NOINLINE

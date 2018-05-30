@@ -35,7 +35,7 @@
 #ifndef ALLOCATOR_TEST_COMMON_H
 #define ALLOCATOR_TEST_COMMON_H
 
-//#include <stdint.h>
+#include <cstdint>
 #include <stdlib.h>
 /*#include <assert.h>
 
@@ -53,7 +53,7 @@
 #define NOINLINE
 #endif
 
-uint64_t getTscCounter();
+int64_t getTscCounter();
 size_t GetMillisecondCount();
 
 #endif // ALLOCATOR_TEST_COMMON_H

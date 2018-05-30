@@ -38,6 +38,7 @@
 #define PAGE_ALLOCATOR_WITH_MAP_H
 
 #include "page_allocator.h"
+#include "test_common.h"
 //#include <map>
 #include <set>
 #include <chrono>
@@ -437,8 +438,9 @@ struct PageDescriptor : public ListItem
 
 struct PageDescriptorHashMap
 {
-	std::chrono::nanoseconds timeAccum;
-	std::chrono::nanoseconds timeReHashAccum;
+	unsigned timeFindAccum;
+	unsigned timeReHashAccum;
+	unsigned findCount = 0;
 	uint32_t maxHashCount = 0;
 	uint32_t maxElemCount = 0;
 
@@ -467,7 +469,7 @@ struct PageDescriptorHashMap
 		assert(tableSzExp < 32);
 		hashSizeExp = tableSzExp;
 		hashSizeMask = static_cast<uint32_t>(expToMask(tableSzExp));
-		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 6) / 10);// aprox is good enought
+		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 7) / 10);// aprox is good enought
 	}
 
 	//FORCE_INLINE
@@ -533,7 +535,8 @@ struct PageDescriptorHashMap
 
 	PageDescriptor* findAndErase(void* ptr)
 	{
-		auto begin_time = std::chrono::high_resolution_clock::now();
+		++findCount;
+		auto begin_time = getTscCounter();
 
 		size_t h = getHash(ptr);
 
@@ -548,8 +551,8 @@ struct PageDescriptorHashMap
 			if (pd->toPtr() == ptr)
 			{
 				hashTable[h].remove(pd);
-				auto diff = std::chrono::high_resolution_clock::now() - begin_time;
-				timeAccum += diff;
+				int64_t diff = getTscCounter() - begin_time;
+				timeFindAccum += diff;
 
 				--count;
 
@@ -588,7 +591,7 @@ struct PageDescriptorHashMap
 		//mb: getFreeBlock will try to insert
 		// so we need to keep hashTable untouched until after it
 
-		uint8_t newSizeExp = hashSizeExp + 2;//TODO improve
+		uint8_t newSizeExp = hashSizeExp + 1;//TODO improve
 		uint32_t newSizeElems = expToSize(newSizeExp);
 
 		size_t newSizeBytes = newSizeElems * sizeof(PageDescriptor);
@@ -597,13 +600,13 @@ struct PageDescriptorHashMap
 		void* ptr = alloc->getFreeBlock(newSizeBytes);
 		ItemList* newHashTable = static_cast<ItemList*>(ptr);
 
-		auto begin_time = std::chrono::high_resolution_clock::now();
+		auto begin_time = getTscCounter();
 
 		for (uint32_t i = 0; i != newSizeElems; ++i)
 			new (&(newHashTable[i])) ItemList();
 		//now we can replace old table with new one
 
-		maxElemCount *= 4;// for statistics pourpouses only
+		maxElemCount *= 2;// for statistics pourpouses only
 
 		uint32_t oldSizeElems = expToSize(hashSizeExp);
 		setTableSizeExp(newSizeExp);
@@ -613,7 +616,7 @@ struct PageDescriptorHashMap
 
 		reHash2(oldTable, oldSizeElems);
 
-		auto diff = std::chrono::high_resolution_clock::now() - begin_time;
+		int64_t diff = getTscCounter() - begin_time;
 		timeReHashAccum += diff;
 
 
@@ -636,13 +639,10 @@ struct PageDescriptorHashMap
 
 	void printStats()
 	{
-		std::chrono::milliseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(timeAccum);
-		std::chrono::milliseconds reHashTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeReHashAccum);
-
-		
 		double load = static_cast<float>(maxElemCount) / expToSize(hashSizeExp);
-		printf("Time spent on find %lld ms, time in rehash %lld ms\n", time.count(), reHashTime.count());
-		printf("max hash count %d, max load %.2f\n", maxHashCount, load);
+		printf("Time spent on find %u ticks, %u ops\n", timeFindAccum, findCount);
+		printf("Time in rehash %u ticks\n", timeReHashAccum);
+		printf("max hash count %u, max load %.2f\n", maxHashCount, load);
 	}
 };
 

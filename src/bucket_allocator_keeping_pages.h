@@ -65,24 +65,7 @@ constexpr size_t BLOCK_SIZE_MASK = expToMask(BLOCK_SIZE_EXP);
 static_assert( ( 1 << BLOCK_SIZE_EXP ) == BLOCK_SIZE, "" );
 static_assert( 1 + BLOCK_SIZE_MASK == BLOCK_SIZE, "" );
 
-constexpr size_t MAX_BUCKET_SIZE = 1 * 1024;
-constexpr uint8_t MAX_BUCKET_SIZE_EXP = sizeToExp(MAX_BUCKET_SIZE);
-constexpr size_t MAX_BUCKET_SIZE_MASK = expToMask(MAX_BUCKET_SIZE_EXP);
-static_assert( ( 1 << MAX_BUCKET_SIZE_EXP ) == MAX_BUCKET_SIZE, "" );
-static_assert( 1 + MAX_BUCKET_SIZE_MASK == MAX_BUCKET_SIZE, "" );
 
-
-constexpr size_t KEEP_EMPTY_BUCKETS = 4;
-constexpr size_t KEEP_FREE_CHUNKS = 100;
-constexpr size_t COMMIT_CHUNK_MULTIPLIER = 1;
-static_assert(COMMIT_CHUNK_MULTIPLIER >= 1, "");
-
-constexpr size_t FIRST_BUCKET_ALIGNMENT = 64;
-constexpr uint8_t FIRST_BUCKET_ALIGNMENT_EXP = sizeToExp(FIRST_BUCKET_ALIGNMENT);
-
-
-
-static constexpr size_t MAX_SMALL_BUCKET_SIZE = 32;
 
 
 class SerializableAllocatorBase

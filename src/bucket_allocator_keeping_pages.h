@@ -74,7 +74,7 @@ class SerializableAllocatorBase
 protected:
 	PageAllocator pageAllocator;
 
-	static constexpr size_t MaxBucketSize = BLOCK_SIZE / 2;
+	static constexpr size_t MaxBucketSize = BLOCK_SIZE / 4;
 	static constexpr size_t BucketCount = 16;
 	void* buckets[BucketCount];
 	static constexpr size_t large_block_idx = 0xFF;

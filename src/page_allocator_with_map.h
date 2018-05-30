@@ -133,7 +133,7 @@ public:
 	FORCE_INLINE
 		uint32_t getCount() const { return count; }
 	FORCE_INLINE
-		bool isEnd(ListItem* item) const { return item == &lst; }
+		const ListItem* end() const { return &lst; }
 
 	FORCE_INLINE
 		ListItem* front()
@@ -204,11 +204,11 @@ public:
 		size_t headerSize = sizeof(SimplifiedBucketBlock2);
 		size_t begin = alignUpExp(headerSize, firstBucketAlignmentExp);
 		ptrdiff_t usableSize = blockSize - begin;
-		assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketsSize[i]);
+		assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketSize);
 		//integral math
-		size_t count = usableSize / bucketSize;
+		size_t bucketCount = usableSize / bucketSize;
 
-		return std::make_pair(begin, count);
+		return std::make_pair(begin, bucketCount);
 	}
 
 
@@ -375,7 +375,7 @@ struct SimplifiedBucketAllocator
 	}
 
 	template<class Allocator>
-	void doHouseKeeping(Allocator* alloc)
+	void doHouseKeeping2(Allocator* alloc)
 	{
 		if (emptys.getCount() == 0)
 		{
@@ -388,10 +388,21 @@ struct SimplifiedBucketAllocator
 			assert(bb->isEmpty());
 			emptys.pushFront(bb);
 		}
-		else if (emptys.getCount() > 3)
+		else
 		{
 			BucketBlock* bb = static_cast<BucketBlock*>(emptys.popFront());
 			alloc->freeChunk(bb);
+		}
+	}
+
+
+	template<class Allocator>
+	FORCE_INLINE
+	void doHouseKeeping(Allocator* alloc)
+	{
+		if (emptys.getCount() == 0 || emptys.getCount() >= 3)
+		{
+			doHouseKeeping2(alloc);
 		}
 	}
 };
@@ -427,67 +438,120 @@ struct PageDescriptor : public ListItem
 struct PageDescriptorHashMap
 {
 	std::chrono::nanoseconds timeAccum;
+	std::chrono::nanoseconds timeReHashAccum;
 	uint32_t maxHashCount = 0;
-	uint32_t elemCount = 0;
 	uint32_t maxElemCount = 0;
 
+	uint32_t count = 0;
+	uint32_t growTableThreshold = 0;
 	std::hash<void*> hh;
-//	uint8_t blockSizeExp;
+	uint8_t blockSizeExp;
 	uint8_t hashSizeExp;
-	size_t hashSizeMask;
-	ItemList* hashMap;
-	std::array<ItemList, 1024> initialHashMap;
+	uint32_t hashSizeMask;
+	ItemList* hashTable;
+	std::array<ItemList, 64> initialHashMap;
 
 	PageDescriptorHashMap() :
-		hashSizeExp(sizeToExp(initialHashMap.size())),
-		hashSizeMask(expToMask(hashSizeExp)),
-		hashMap(initialHashMap.data())
+		hashTable(initialHashMap.data())
 	{
+		setTableSizeExp(sizeToExp(initialHashMap.size()));
 	}
 
-	void initialize()
+	void initialize(uint8_t blkSzExp)
 	{
-//		blockSizeExp = blkSzExp;
+		blockSizeExp = blkSzExp;
+	}
+
+	void setTableSizeExp(uint8_t tableSzExp)
+	{
+		assert(tableSzExp < 32);
+		hashSizeExp = tableSzExp;
+		hashSizeMask = static_cast<uint32_t>(expToMask(tableSzExp));
+		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 6) / 10);// aprox is good enought
+	}
+
+	//FORCE_INLINE
+	//size_t getHash(void* ptr)
+	//{
+	//	size_t u = hh(ptr);
+	//	u &= hashSizeMask;
+
+	//	return u;
+	//}
+
+
+	// mb: hash functions taken from https://gist.github.com/badboy/6267743
+	FORCE_INLINE
+		uint32_t doHash(uint64_t key)
+	{
+		key = (~key) + (key << 18); // key = (key << 18) - key - 1;
+		key = key ^ (key >> 31);
+		key = key * 21; // key = (key + (key << 2)) + (key << 4);
+		key = key ^ (key >> 11);
+		key = key + (key << 6);
+		key = key ^ (key >> 22);
+		return static_cast<uint32_t>(key);
 	}
 
 	FORCE_INLINE
-	size_t getHash(void* ptr)
+		uint32_t doHash(uint32_t key)
 	{
-		size_t u = hh(ptr);
+		key = ~key + (key << 15); // key = (key << 15) - key - 1;
+		key = key ^ (key >> 12);
+		key = key + (key << 2);
+		key = key ^ (key >> 4);
+		key = key * 2057; // key = (key + (key << 3)) + (key << 11);
+		key = key ^ (key >> 16);
+		return key;
+	}
+
+	FORCE_INLINE
+		uint32_t getHash(void* ptr)
+	{
+		//mb: uintptr_t will call uint32_t or uint64_t overload
+		// depending on 32 / 64 bits build
+		uint32_t u = doHash(reinterpret_cast<uintptr_t>(ptr));
+
 		u &= hashSizeMask;
 
 		return u;
 	}
 
+
 	void insert(PageDescriptor* pd)
 	{
-		size_t h = getHash(pd->toPtr());
+		assert(!pd->isInList());
 
-		hashMap[h].pushFront(pd);
+		uint32_t h = getHash(pd->toPtr());
 
-		maxHashCount = std::max(maxHashCount, hashMap[h].getCount());
-		++elemCount;
-		maxElemCount = std::max(maxElemCount, elemCount);
+		hashTable[h].pushFront(pd);
+
+		maxHashCount = std::max(maxHashCount, hashTable[h].getCount());
+		++count;
+		maxElemCount = std::max(maxElemCount, count);
 	}
 
 	PageDescriptor* findAndErase(void* ptr)
 	{
 		auto begin_time = std::chrono::high_resolution_clock::now();
+
 		size_t h = getHash(ptr);
-		assert(!hashMap[h].empty());
 
-		ListItem* current = hashMap[h].front();
+		assert(!hashTable[h].empty());
 
-		while (!hashMap[h].isEnd(current))
+		ListItem* current = hashTable[h].front();
+		const ListItem* endPtr = hashTable[h].end();
+
+		while (current != endPtr)
 		{
 			PageDescriptor* pd = static_cast<PageDescriptor*>(current);
 			if (pd->toPtr() == ptr)
 			{
-				hashMap[h].remove(pd);
+				hashTable[h].remove(pd);
 				auto diff = std::chrono::high_resolution_clock::now() - begin_time;
 				timeAccum += diff;
 
-				--elemCount;
+				--count;
 
 				return pd;
 			}
@@ -498,10 +562,87 @@ struct PageDescriptorHashMap
 		return nullptr;
 	}
 
+	void reHash2(ItemList* oldTable, uint32_t oldTableSize)
+	{
+		for (uint32_t i = 0; i != oldTableSize; ++i)
+		{
+			ListItem* current = oldTable[i].front();
+			const ListItem* endPtr = oldTable[i].end();
+			while (current != endPtr)
+			{
+				PageDescriptor* pd = static_cast<PageDescriptor*>(current);
+
+				//mb: get next before modify, since internal list is shared
+				current = current->listGetNext();
+
+				oldTable[i].remove(pd);
+				insert(pd);
+
+			}
+		}
+	}
+
+	template<class Allocator>
+		void reHash(Allocator* alloc)
+	{
+		//mb: getFreeBlock will try to insert
+		// so we need to keep hashTable untouched until after it
+
+		uint8_t newSizeExp = hashSizeExp + 2;//TODO improve
+		uint32_t newSizeElems = expToSize(newSizeExp);
+
+		size_t newSizeBytes = newSizeElems * sizeof(PageDescriptor);
+		newSizeBytes = alignUpExp(newSizeBytes, blockSizeExp);
+
+		void* ptr = alloc->getFreeBlock(newSizeBytes);
+		ItemList* newHashTable = static_cast<ItemList*>(ptr);
+
+		auto begin_time = std::chrono::high_resolution_clock::now();
+
+		for (uint32_t i = 0; i != newSizeElems; ++i)
+			new (&(newHashTable[i])) ItemList();
+		//now we can replace old table with new one
+
+		maxElemCount *= 4;// for statistics pourpouses only
+
+		uint32_t oldSizeElems = expToSize(hashSizeExp);
+		setTableSizeExp(newSizeExp);
+
+		ItemList* oldTable = hashTable;
+		hashTable = newHashTable;
+
+		reHash2(oldTable, oldSizeElems);
+
+		auto diff = std::chrono::high_resolution_clock::now() - begin_time;
+		timeReHashAccum += diff;
+
+
+		//now delete old table if needed
+		if ((void*)oldTable != (void*)&initialHashMap)
+			alloc->freeChunk(oldTable);
+	}
+
+
+	template<class Allocator>
+	FORCE_INLINE
+	void doHouseKeeping(Allocator* alloc)
+	{
+		if(count >= growTableThreshold)
+		{
+			reHash(alloc);
+		}
+	}
+
+
 	void printStats()
 	{
 		std::chrono::milliseconds time = std::chrono::duration_cast<std::chrono::milliseconds>(timeAccum);
-		printf("Time spent on find %lld ms, max hash count %u, max elem count %u\n", time.count(), maxHashCount, maxElemCount);
+		std::chrono::milliseconds reHashTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeReHashAccum);
+
+		
+		double load = static_cast<float>(maxElemCount) / expToSize(hashSizeExp);
+		printf("Time spent on find %lld ms, time in rehash %lld ms\n", time.count(), reHashTime.count());
+		printf("max hash count %d, max load %.2f\n", maxHashCount, load);
 	}
 };
 
@@ -533,7 +674,7 @@ public:
 
 		void* ptr = VirtualMemory::allocate(blockSize);
 		
-		usedBlocks.initialize();
+		usedBlocks.initialize(blockSizeExp);
 		buckets.initialize(ptr, blockSizeExp);
 
 		void* bkt = buckets.allocate();
@@ -624,6 +765,7 @@ public:
 	void doHouseKeeping()
 	{
 		buckets.doHouseKeeping(this);
+		usedBlocks.doHouseKeeping(this);
 	}
 
 	void printStats()

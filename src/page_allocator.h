@@ -283,7 +283,7 @@ public:
 
 
 constexpr size_t max_cached_size = 256; // # of pages
-constexpr size_t single_page_cache_size = 64;
+constexpr size_t single_page_cache_size = 1024;
 constexpr size_t multi_page_cache_size = 2;
 
 struct PageAllocatorWithCaching // to be further developed for practical purposes

@@ -137,7 +137,7 @@ public:
 		size_t headerSize = sizeof(BucketBlockV2);
 		size_t begin = alignUpExp(headerSize, firstBucketAlignmentExp);
 		ptrdiff_t usableSize = blockSize - begin;
-		assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketsSize[i]);
+		assert(usableSize > 0 && static_cast<size_t>(usableSize) >= bucketSize);
 		//integral math
 		size_t count = usableSize / bucketSize;
 

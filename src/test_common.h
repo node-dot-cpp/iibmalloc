@@ -53,6 +53,7 @@
 #define NOINLINE
 #endif
 
+uint64_t getTscCounter();
 size_t GetMillisecondCount();
 
 #endif // ALLOCATOR_TEST_COMMON_H

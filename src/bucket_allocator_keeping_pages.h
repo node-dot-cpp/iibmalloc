@@ -207,7 +207,7 @@ public:
 
 //		usedNonBuckets.pushFront(chk);
 #ifdef USE_ITEM_HEADER
-		reinterpret_cast<ItemHeader*>( block + sizeof( ChunkHeader) )->idx = large_block_idx;
+		( reinterpret_cast<ItemHeader*>( reinterpret_cast<uint8_t*>(block) + memStart ) - 1 )->idx = large_block_idx;
 #endif // USE_ITEM_HEADER
 		return reinterpret_cast<uint8_t*>(block) + memStart;
 	}

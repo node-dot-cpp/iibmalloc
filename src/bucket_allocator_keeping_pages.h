@@ -99,7 +99,10 @@ protected:
 	{
 		MemoryBlockListItem block;
 		size_t idx;
+		ChunkHeader* next;
 	};
+	
+	ChunkHeader* nextPage = nullptr;
 
 protected:
 	static constexpr
@@ -175,6 +178,8 @@ public:
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 		ChunkHeader* h = reinterpret_cast<ChunkHeader*>( block );
 		h->idx = szidx;
+		h->next = nextPage;
+		nextPage = h;
 		uint8_t* mem = block + memStart;
 		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
 		assert( bucketSz >= sizeof( void* ) );
@@ -252,10 +257,19 @@ public:
 		memset( buckets, 0, sizeof( void* ) * BucketCount );
 	}
 
+	void deinitialize()
+	{
+		while ( nextPage )
+		{
+			ChunkHeader* next = nextPage->next;
+			pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(nextPage) );
+			nextPage = next;
+		}
+	}
+
 	~SerializableAllocatorBase()
 	{
-		for ( size_t i=0; i<BucketCount; ++i )
-			assert( buckets[i] == 0 );
+		deinitialize();
 	}
 };
 

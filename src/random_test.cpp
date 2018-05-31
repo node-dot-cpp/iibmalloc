@@ -1945,37 +1945,10 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 	params.startupParams.allocatorType = allocatorType; // restore
 }
 
-/*#include <x86intrin.h>
-inline unsigned long long getRdtsc(void)
-{
-#ifdef _MSC_VER
-	return __rdtsc();
-#else
-#if defined(__i386__)
-    unsigned long long tick;
-    __asm__ __volatile__("rdtsc" : "=A"(tick));
-    return tick;
-#elif defined(__x86_64__)
-    unsigned int tickl, tickh;
-    __asm__ __volatile__("rdtsc" : "=a"(tickl), "=d"(tickh));
-    return ((unsigned long long)tickh << 32)|tickl;
-#else
-#error "getting rdtsc is yet to be impleneted for this platform"
-#endif
-#endif
-}*/
-
 
 int main()
 {
 	TestRes testRes[max_threads];
-//	TestRes testRes[max_threads];
-/*	uint64_t val1 = __builtin_ia32_rdtsc();
-	uint64_t val2 = getRdtsc();
-	printf( "timediff = %zd\n", val2-val1 );
-	uint64_t val3 = __rdtsc();
-	printf( "timediff = %zd\n", val3-val2 );
-	return 0;*/
 
 	if( 1 )
 	{

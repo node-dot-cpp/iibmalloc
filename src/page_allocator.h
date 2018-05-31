@@ -321,9 +321,9 @@ public:
 };
 
 
-constexpr size_t max_cached_size = 256; // # of pages
-constexpr size_t single_page_cache_size = 4;
-constexpr size_t multi_page_cache_size = 2;
+constexpr size_t max_cached_size = 32; // # of pages
+constexpr size_t single_page_cache_size = 8;
+constexpr size_t multi_page_cache_size = 4;
 
 struct PageAllocatorWithCaching // to be further developed for practical purposes
 {
@@ -341,6 +341,22 @@ public:
 	void initialize(uint8_t blockSizeExp)
 	{
 		this->blockSizeExp = blockSizeExp;
+	}
+
+	void deinitialize()
+	{
+		for ( size_t ix=0; ix<=max_cached_size; ++ ix )
+		{
+			while ( !freeBlocks[ix].empty() )
+			{
+				MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(freeBlocks[ix].popFront());
+				size_t sz = chk->getSize();
+				uint64_t start = __rdtsc();
+				VirtualMemory::deallocate(chk, sz );
+				uint64_t end = __rdtsc();
+				stats.registerSysDealloc( sz, end - start );
+			}
+		}
 	}
 
 	MemoryBlockListItem* getFreeBlock(size_t sz)

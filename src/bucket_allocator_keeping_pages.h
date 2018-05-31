@@ -35,22 +35,16 @@
 #ifndef SERIALIZABLE_ALLOCATOR_KEEPING_PAGES_H
 #define SERIALIZABLE_ALLOCATOR_KEEPING_PAGES_H
 
-#define NOMINMAX
-
-
 #include <cstdlib>
 #include <cstring>
 #include <limits>
-#include <algorithm>
 
 #include "bucket_allocator_common.h"
 #include "page_allocator.h"
 
 
-
 class SerializableAllocatorBase;
 extern thread_local SerializableAllocatorBase g_AllocManager;
-
 
 
 constexpr size_t ALIGNMENT = 2 * sizeof(uint64_t);
@@ -72,7 +66,7 @@ static_assert( 1 + BLOCK_SIZE_MASK == BLOCK_SIZE, "" );
 class SerializableAllocatorBase
 {
 protected:
-	PageAllocator pageAllocator;
+	PageAllocatorWithCaching pageAllocator;
 
 	static constexpr size_t MaxBucketSize = BLOCK_SIZE / 4;
 	static constexpr size_t BucketCount = 16;
@@ -253,7 +247,7 @@ public:
 			else
 			{
 				ChunkHeader* ch = getChunkFromUsrPtr( ptr );
-				assert( reinterpret_cast<uint8_t*>(ch) == reinterpret_cast<uint8_t*>(ih) );
+//				assert( reinterpret_cast<uint8_t*>(ch) == reinterpret_cast<uint8_t*>(ih) );
 				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(ch) );
 			}
 #else
@@ -273,7 +267,7 @@ public:
 	
 	void printStats()
 	{
-//		heap.printStats();
+		pageAllocator.printStats();
 	}
 
 	void initialize(size_t size)
@@ -284,6 +278,7 @@ public:
 	void initialize()
 	{
 		memset( buckets, 0, sizeof( void* ) * BucketCount );
+		pageAllocator.initialize( BLOCK_SIZE_EXP );
 	}
 
 	void deinitialize()
@@ -294,6 +289,7 @@ public:
 			pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(nextPage) );
 			nextPage = next;
 		}
+		pageAllocator.deinitialize();
 	}
 
 	~SerializableAllocatorBase()

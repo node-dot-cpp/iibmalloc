@@ -448,7 +448,6 @@ struct PageDescriptorHashMap
 
 	uint32_t count = 0;
 	uint32_t growTableThreshold = 0;
-	static constexpr uint64_t p = 2654435761;
 	uint8_t blockSizeExp;
 	uint8_t hashSizeExp;
 	uint64_t hashSizeMask;
@@ -477,9 +476,10 @@ struct PageDescriptorHashMap
 	FORCE_INLINE
 		uint32_t getHash(void* ptr)
 	{
+		//mb: simplified knuth's multiplicative hash. check!!!
 		uint64_t uu = reinterpret_cast<uint64_t>(ptr);
-		uu >>= blockSizeExp;
-		uu *= p;
+		uu >>= blockSizeExp; //remove known zeros
+		uu *= 2654435769;
 		uu >>= 32;
 		uu &= hashSizeMask;
 

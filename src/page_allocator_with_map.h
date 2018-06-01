@@ -438,13 +438,13 @@ struct PageDescriptor : public ListItem
 
 struct PageDescriptorHashMap
 {
-	int timeInsertAccum = 0;
-	int timeFindAccum = 0;
-	int timeReHashAccum = 0;
-	unsigned insertCount = 0;
-	unsigned findCount = 0;
-	uint32_t maxHashCount = 0;
-	uint32_t maxElemCount = 0;
+	//int timeInsertAccum = 0;
+	//int timeFindAccum = 0;
+	//int timeReHashAccum = 0;
+	//unsigned insertCount = 0;
+	//unsigned findCount = 0;
+	//uint32_t maxHashCount = 0;
+	//uint32_t maxElemCount = 0;
 
 	uint32_t count = 0;
 	uint32_t growTableThreshold = 0;
@@ -491,27 +491,25 @@ struct PageDescriptorHashMap
 	{
 		assert(!pd->isInList());
 
-		++insertCount;
+		//++insertCount;
+		//auto begin_time = GetMicrosecondCount();
 
-		auto begin_time = GetMicrosecondCount();
 		uint32_t h = getHash(pd->toPtr());
 
 		hashTable[h].pushFront(pd);
-
-		int64_t diff = GetMicrosecondCount() - begin_time;
-		timeInsertAccum += diff;
-
-
-		maxHashCount = std::max(maxHashCount, hashTable[h].getCount());
 		++count;
-		maxElemCount = std::max(maxElemCount, count);
+
+		//int64_t diff = GetMicrosecondCount() - begin_time;
+		//timeInsertAccum += diff;
+		//maxHashCount = std::max(maxHashCount, hashTable[h].getCount());
+		//maxElemCount = std::max(maxElemCount, count);
 	}
 
 	PageDescriptor* findAndErase(void* ptr)
 	{
-		++findCount;
+		//++findCount;
+		//auto begin_time = GetMicrosecondCount();
 
-		auto begin_time = GetMicrosecondCount();
 		size_t h = getHash(ptr);
 
 		assert(!hashTable[h].empty());
@@ -521,10 +519,10 @@ struct PageDescriptorHashMap
 		if (static_cast<PageDescriptor*>(current)->toPtr() == ptr)
 		{
 			hashTable[h].remove(current);
-			int64_t diff = GetMicrosecondCount() - begin_time;
-			timeFindAccum += diff;
-
 			--count;
+
+			//int64_t diff = GetMicrosecondCount() - begin_time;
+			//timeFindAccum += diff;
 
 			return static_cast<PageDescriptor*>(current);
 		}
@@ -538,10 +536,10 @@ struct PageDescriptorHashMap
 			if (pd->toPtr() == ptr)
 			{
 				hashTable[h].remove(pd);
-				int64_t diff = GetMicrosecondCount() - begin_time;
-				timeFindAccum += diff;
-
 				--count;
+
+				//int64_t diff = GetMicrosecondCount() - begin_time;
+				//timeFindAccum += diff;
 
 				return pd;
 			}
@@ -587,13 +585,13 @@ struct PageDescriptorHashMap
 		void* ptr = alloc->getFreeBlock(newSizeBytes);
 		ItemList* newHashTable = static_cast<ItemList*>(ptr);
 
-		auto begin_time = GetMicrosecondCount();
+		//auto begin_time = GetMicrosecondCount();
 
 		for (uint32_t i = 0; i != newSizeElems; ++i)
 			new (&(newHashTable[i])) ItemList();
 		//now we can replace old table with new one
 
-		maxElemCount *= 2;// for statistics pourpouses only
+//		maxElemCount *= 2;// for statistics pourpouses only
 
 		uint32_t oldSizeElems = expToSize(hashSizeExp);
 		setTableSizeExp(newSizeExp);
@@ -603,8 +601,8 @@ struct PageDescriptorHashMap
 
 		reHash2(oldTable, oldSizeElems);
 
-		int64_t diff = GetMicrosecondCount() - begin_time;
-		timeReHashAccum += diff;
+		//int64_t diff = GetMicrosecondCount() - begin_time;
+		//timeReHashAccum += diff;
 
 
 		//now delete old table if needed
@@ -626,11 +624,11 @@ struct PageDescriptorHashMap
 
 	void printStats()
 	{
-		double load = static_cast<float>(maxElemCount) / expToSize(hashSizeExp);
-		printf("Time on insert %d ms / Mops\n", (timeInsertAccum * 1000) / insertCount);
-		printf("Time on find   %d ms / Mops\n", (timeFindAccum * 1000) / findCount);
-		printf("Time in rehash %d us\n", timeReHashAccum);
-		printf("max hash count %u, max load %.2f\n", maxHashCount, load);
+		//double load = static_cast<float>(maxElemCount) / expToSize(hashSizeExp);
+		//printf("Time on insert %d ms / Mops\n", (timeInsertAccum * 1000) / insertCount);
+		//printf("Time on find   %d ms / Mops\n", (timeFindAccum * 1000) / findCount);
+		//printf("Time in rehash %d us\n", timeReHashAccum);
+		//printf("max hash count %u, max load %.2f\n", maxHashCount, load);
 	}
 };
 

@@ -470,7 +470,7 @@ struct PageDescriptorHashMap
 		assert(tableSzExp < 32);
 		hashSizeExp = tableSzExp;
 		hashSizeMask = expToMask(tableSzExp);
-		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 10) / 10);// aprox is good enought
+		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 9) / 10);// aprox is good enought
 	}
 
 	FORCE_INLINE

@@ -1961,15 +1961,15 @@ int main()
 		params.startupParams.maxItemSize2 = 16;
 		params.startupParams.maxItems2 = 16;
 		params.startupParams.memReadCnt = 0;
-//		params.startupParams.allocatorType = TRY_ALL;
+		params.startupParams.allocatorType = TRY_ALL;
 //		params.startupParams.allocatorType = USE_EMPTY_TEST;
 //		params.startupParams.allocatorType = USE_NEW_DELETE;
-		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
+//		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
 		params.startupParams.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
 
 		size_t threadCountMax = 23;
 
-		for ( params.startupParams.threadCount=23; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
+		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{
 			params.startupParams.maxItems = (1 << 24) / params.startupParams.threadCount;
 			params.testRes = testRes + params.startupParams.threadCount;

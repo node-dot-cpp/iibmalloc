@@ -394,6 +394,23 @@ public:
 		throw std::bad_alloc();
 	}
 
+	void* getFreeBlockNoCache(size_t sz)
+	{
+		stats.registerAllocRequest( sz );
+
+		assert(isAlignedExp(sz, blockSizeExp));
+
+		uint64_t start = __rdtsc();
+		void* ptr = VirtualMemory::allocate(sz);
+		uint64_t end = __rdtsc();
+		stats.registerSysAlloc( sz, end - start );
+
+		if (ptr)
+			return ptr;
+
+		throw std::bad_alloc();
+	}
+
 
 	void freeChunk( MemoryBlockListItem* chk )
 	{
@@ -421,6 +438,19 @@ public:
 
 		uint64_t start = __rdtsc();
 		VirtualMemory::deallocate(chk, sz );
+		uint64_t end = __rdtsc();
+		stats.registerSysDealloc( sz, end - start );
+	}
+
+	void freeChunkNoCache( void* block, size_t sz )
+	{
+//		assert(!chk->isFree());
+//		assert(!chk->isInList());
+
+		stats.registerDeallocRequest( sz );
+
+		uint64_t start = __rdtsc();
+		VirtualMemory::deallocate( block, sz );
 		uint64_t end = __rdtsc();
 		stats.registerSysDealloc( sz, end - start );
 	}

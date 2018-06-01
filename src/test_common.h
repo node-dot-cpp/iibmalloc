@@ -53,7 +53,7 @@
 #define NOINLINE
 #endif
 
-int64_t GetMicrosecondCount();
+constexpr int64_t GetMicrosecondCount() { return 0; }
 size_t GetMillisecondCount();
 
 #endif // ALLOCATOR_TEST_COMMON_H

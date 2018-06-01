@@ -43,7 +43,7 @@
 #include <time.h>
 #endif
 
-
+/*
 int64_t GetMicrosecondCount()
 {
 	int64_t now = 0;
@@ -63,7 +63,7 @@ int64_t GetMicrosecondCount()
 #endif
 	return now;
 }
-
+*/
 
 
 NOINLINE

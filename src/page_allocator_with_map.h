@@ -438,18 +438,20 @@ struct PageDescriptor : public ListItem
 
 struct PageDescriptorHashMap
 {
-	unsigned timeFindAccum;
-	unsigned timeReHashAccum;
+	int timeInsertAccum = 0;
+	int timeFindAccum = 0;
+	int timeReHashAccum = 0;
+	unsigned insertCount = 0;
 	unsigned findCount = 0;
 	uint32_t maxHashCount = 0;
 	uint32_t maxElemCount = 0;
 
 	uint32_t count = 0;
 	uint32_t growTableThreshold = 0;
-	std::hash<void*> hh;
+	static constexpr uint64_t p = 2654435761;
 	uint8_t blockSizeExp;
 	uint8_t hashSizeExp;
-	uint32_t hashSizeMask;
+	uint64_t hashSizeMask;
 	ItemList* hashTable;
 	std::array<ItemList, 64> initialHashMap;
 
@@ -468,55 +470,20 @@ struct PageDescriptorHashMap
 	{
 		assert(tableSzExp < 32);
 		hashSizeExp = tableSzExp;
-		hashSizeMask = static_cast<uint32_t>(expToMask(tableSzExp));
-		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 7) / 10);// aprox is good enought
-	}
-
-	//FORCE_INLINE
-	//size_t getHash(void* ptr)
-	//{
-	//	size_t u = hh(ptr);
-	//	u &= hashSizeMask;
-
-	//	return u;
-	//}
-
-
-	// mb: hash functions taken from https://gist.github.com/badboy/6267743
-	FORCE_INLINE
-		uint32_t doHash(uint64_t key)
-	{
-		key = (~key) + (key << 18); // key = (key << 18) - key - 1;
-		key = key ^ (key >> 31);
-		key = key * 21; // key = (key + (key << 2)) + (key << 4);
-		key = key ^ (key >> 11);
-		key = key + (key << 6);
-		key = key ^ (key >> 22);
-		return static_cast<uint32_t>(key);
-	}
-
-	FORCE_INLINE
-		uint32_t doHash(uint32_t key)
-	{
-		key = ~key + (key << 15); // key = (key << 15) - key - 1;
-		key = key ^ (key >> 12);
-		key = key + (key << 2);
-		key = key ^ (key >> 4);
-		key = key * 2057; // key = (key + (key << 3)) + (key << 11);
-		key = key ^ (key >> 16);
-		return key;
+		hashSizeMask = expToMask(tableSzExp);
+		growTableThreshold = static_cast<uint32_t>((expToSize(tableSzExp) * 10) / 10);// aprox is good enought
 	}
 
 	FORCE_INLINE
 		uint32_t getHash(void* ptr)
 	{
-		//mb: uintptr_t will call uint32_t or uint64_t overload
-		// depending on 32 / 64 bits build
-		uint32_t u = doHash(reinterpret_cast<uintptr_t>(ptr));
+		uint64_t uu = reinterpret_cast<uint64_t>(ptr);
+		uu >>= blockSizeExp;
+		uu *= p;
+		uu >>= 32;
+		uu &= hashSizeMask;
 
-		u &= hashSizeMask;
-
-		return u;
+		return static_cast<uint32_t>(uu);
 	}
 
 
@@ -524,9 +491,16 @@ struct PageDescriptorHashMap
 	{
 		assert(!pd->isInList());
 
+		++insertCount;
+
+		auto begin_time = GetMicrosecondCount();
 		uint32_t h = getHash(pd->toPtr());
 
 		hashTable[h].pushFront(pd);
+
+		int64_t diff = GetMicrosecondCount() - begin_time;
+		timeInsertAccum += diff;
+
 
 		maxHashCount = std::max(maxHashCount, hashTable[h].getCount());
 		++count;
@@ -536,13 +510,26 @@ struct PageDescriptorHashMap
 	PageDescriptor* findAndErase(void* ptr)
 	{
 		++findCount;
-		auto begin_time = getTscCounter();
 
+		auto begin_time = GetMicrosecondCount();
 		size_t h = getHash(ptr);
 
 		assert(!hashTable[h].empty());
 
 		ListItem* current = hashTable[h].front();
+		//first check the most likely case
+		if (static_cast<PageDescriptor*>(current)->toPtr() == ptr)
+		{
+			hashTable[h].remove(current);
+			int64_t diff = GetMicrosecondCount() - begin_time;
+			timeFindAccum += diff;
+
+			--count;
+
+			return static_cast<PageDescriptor*>(current);
+		}
+
+
 		const ListItem* endPtr = hashTable[h].end();
 
 		while (current != endPtr)
@@ -551,7 +538,7 @@ struct PageDescriptorHashMap
 			if (pd->toPtr() == ptr)
 			{
 				hashTable[h].remove(pd);
-				int64_t diff = getTscCounter() - begin_time;
+				int64_t diff = GetMicrosecondCount() - begin_time;
 				timeFindAccum += diff;
 
 				--count;
@@ -575,7 +562,7 @@ struct PageDescriptorHashMap
 			{
 				PageDescriptor* pd = static_cast<PageDescriptor*>(current);
 
-				//mb: get next before modify, since internal list is shared
+				//mb: get next before modify, since internal list is reused
 				current = current->listGetNext();
 
 				oldTable[i].remove(pd);
@@ -600,7 +587,7 @@ struct PageDescriptorHashMap
 		void* ptr = alloc->getFreeBlock(newSizeBytes);
 		ItemList* newHashTable = static_cast<ItemList*>(ptr);
 
-		auto begin_time = getTscCounter();
+		auto begin_time = GetMicrosecondCount();
 
 		for (uint32_t i = 0; i != newSizeElems; ++i)
 			new (&(newHashTable[i])) ItemList();
@@ -616,7 +603,7 @@ struct PageDescriptorHashMap
 
 		reHash2(oldTable, oldSizeElems);
 
-		int64_t diff = getTscCounter() - begin_time;
+		int64_t diff = GetMicrosecondCount() - begin_time;
 		timeReHashAccum += diff;
 
 
@@ -640,8 +627,9 @@ struct PageDescriptorHashMap
 	void printStats()
 	{
 		double load = static_cast<float>(maxElemCount) / expToSize(hashSizeExp);
-		printf("Time spent on find %u ticks, %u ops\n", timeFindAccum, findCount);
-		printf("Time in rehash %u ticks\n", timeReHashAccum);
+		printf("Time on insert %d ms / Mops\n", (timeInsertAccum * 1000) / insertCount);
+		printf("Time on find   %d ms / Mops\n", (timeFindAccum * 1000) / findCount);
+		printf("Time in rehash %d us\n", timeReHashAccum);
 		printf("max hash count %u, max load %.2f\n", maxHashCount, load);
 	}
 };

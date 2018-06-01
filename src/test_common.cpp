@@ -44,13 +44,27 @@
 #endif
 
 
-int64_t getTscCounter()
+int64_t GetMicrosecondCount()
 {
+	int64_t now = 0;
+#ifdef _MSC_VER
+	static int64_t frec = 0;
+	if (frec == 0)
+	{
+		LARGE_INTEGER val;
+		BOOL ok = QueryPerformanceFrequency(&val);
+		assert(ok);
+		frec = val.QuadPart;
+	}
 	LARGE_INTEGER val;
 	BOOL ok = QueryPerformanceCounter(&val);
 	assert(ok);
-	return static_cast<int64_t>(val.QuadPart);
+	now = (val.QuadPart * 1000000) / frec;
+#endif
+	return now;
 }
+
+
 
 NOINLINE
 size_t GetMillisecondCount()

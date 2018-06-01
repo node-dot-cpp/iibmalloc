@@ -89,7 +89,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 
 	void* getNextBlock()
 	{
-		void* pages = getFreeBlockNoCache( BLOCK_SIZE * total_cnt ); // TODO: replace by reservation, if possible
+		void* pages = this->getFreeBlockNoCache( BLOCK_SIZE * total_cnt ); // TODO: replace by reservation, if possible
 		MemoryBlockHeader* h = reinterpret_cast<MemoryBlockHeader*>( pages );
 		h->next = memoryBlockHead;
 		memoryBlockHead = h;
@@ -106,6 +106,17 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		pageBlockListCurrent->next = pb;
 		pageBlockListCurrent = pb;
 		return idxToPageAddr( pb->blockAddress, reasonIdx );
+	}
+
+	void resetLists()
+	{
+		pageBlockListStart.blockAddress = nullptr;
+		pageBlockListStart.usageMask = 0;
+		pageBlockListStart.next = nullptr;
+
+		pageBlockListCurrent = &pageBlockListStart;
+		for ( size_t i=0; i<total_cnt; ++i )
+			indexHead[i] = pageBlockListCurrent;
 	}
 
 public:
@@ -130,14 +141,7 @@ public:
 	void initialize( uint8_t blockSizeExp )
 	{
 		BasePageAllocator::initialize( blockSizeExp );
-
-		pageBlockListStart.blockAddress = nullptr;
-		pageBlockListStart.usageMask = 0;
-		pageBlockListStart.next = nullptr;
-
-		pageBlockListCurrent = &pageBlockListStart;
-		for ( size_t i=0; i<total_cnt; ++i )
-			indexHead[i] = pageBlockListCurrent;
+		resetLists();
 	}
 
 	void* getPage( size_t idx )
@@ -176,11 +180,12 @@ public:
 		while( next )
 		{
 			assert( next->blockAddress );
-			freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), BLOCK_SIZE * total_cnt );
+			this->freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), BLOCK_SIZE * total_cnt );
 			PageBlockDescriptor* tmp = next->next;
 			delete next;
 			next = tmp;
 		}
+		resetLists();
 		BasePageAllocator::deinitialize();
 	}
 };

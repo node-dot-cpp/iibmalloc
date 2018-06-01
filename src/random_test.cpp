@@ -1708,21 +1708,21 @@ void* runRandomTest( void* params )
 				case USE_PER_THREAD_ALLOCATOR:
 				{
 					PerThreadAllocatorUnderTest allocator( testParams->threadResPerThreadAlloc );
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocator() ...\n", testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess UsingPerThreadAllocator() ...\n", testParams->threadID );
 					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
 					break;
 				}
 				case USE_NEW_DELETE:
 				{
 					NewDeleteUnderTest allocator( testParams->threadResNewDel );
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingNewAndDelete() ...\n", testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess UsingNewAndDelete() ...\n", testParams->threadID );
 					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
 					break;
 				}
 				case USE_EMPTY_TEST:
 				{
 					FakeAllocatorUnderTest allocator( testParams->threadResEmpty );
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_Empty() ...\n", testParams->threadID );
+					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess Empty() ...\n", testParams->threadID );
 					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
 					break;
 				}

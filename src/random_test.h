@@ -371,6 +371,7 @@ public:
 template< class AllocatorUnderTest>
 void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
 {
+//	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
 	size_t start = GetMillisecondCount();
@@ -410,16 +411,18 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 	allocatorUnderTest.doWhateverAfterSetupPhase();
 
 	// main loop
-	for ( size_t i=0;i<iterCount; ++i )
+	for ( size_t j=0;j<iterCount; ++j )
 	{
 		size_t randNum = rng();
 		size_t idx = randNum % maxItems;
 		if ( baseBuff[idx].ptr )
 		{
-			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
-				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
-			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
-				dummyCtr += baseBuff[idx].ptr[i];
+			size_t i=0;
+			for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+				dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+			uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+			for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+				dummyCtr += tail[i];
 			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
 			baseBuff[idx].ptr = 0;
 		}
@@ -437,10 +440,12 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 	for ( size_t idx=0; idx<maxItems; ++idx )
 		if ( baseBuff[idx].ptr )
 		{
-			for ( size_t i=0; i<baseBuff[idx].sz; i+=sizeof(size_t ) )
-				dummyCtr += *( reinterpret_cast<size_t*>( baseBuff[idx].ptr + i ) );
-			for ( size_t i=baseBuff[idx].sz%sizeof(size_t); i<(baseBuff[idx].sz/sizeof(size_t))*sizeof(size_t); ++i )
-				dummyCtr += baseBuff[idx].ptr[i];
+			size_t i=0;
+			for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+				dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+			uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+			for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+				dummyCtr += tail[i];
 			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
 		}
 

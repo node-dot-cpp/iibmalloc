@@ -213,6 +213,9 @@ struct TestRes
 	size_t durEmpty;
 	size_t durNewDel;
 	size_t durPerThreadAlloc;
+	size_t cumulativeDurEmpty;
+	size_t cumulativeDurNewDel;
+	size_t cumulativeDurPerThreadAlloc;
 	ThreadTestRes threadResEmpty[max_threads];
 	ThreadTestRes threadResNewDel[max_threads];
 	ThreadTestRes threadResPerThreadAlloc[max_threads];

@@ -138,3 +138,22 @@ void VirtualMemory::deallocate(void* ptr, size_t size)
 	assert( OK );
 }
 
+void* VirtualMemory::AllocateAddressSpace(size_t size)
+{
+    return VirtualAlloc(NULL, size, MEM_RESERVE , PAGE_NOACCESS);
+}
+ 
+void* VirtualMemory::CommitMemory(void* addr, size_t size)
+{
+    return VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE);
+}
+ 
+void VirtualMemory::DecommitMemory(void* addr, size_t size)
+{
+    VirtualFree((void*)addr, size, MEM_DECOMMIT);
+}
+ 
+void VirtualMemory::FreeAddressSpace(void* addr, size_t size)
+{
+    VirtualFree((void*)addr, 0, MEM_RELEASE);
+}

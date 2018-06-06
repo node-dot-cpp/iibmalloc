@@ -66,6 +66,11 @@ public:
 	static void* allocate(size_t size);
 	static void deallocate(void* ptr, size_t size);
 //	static void release(void* addr);
+
+	static void* AllocateAddressSpace(size_t size);
+	static void* CommitMemory(void* addr, size_t size);
+	static void DecommitMemory(void* addr, size_t size);
+	static void FreeAddressSpace(void* addr, size_t size);
 };
 
 struct MemoryBlockListItem
@@ -220,11 +225,11 @@ struct BlockStats
 	uint64_t sysDeallocSize = 0;
 	uint64_t rdtscSysDeallocSpent = 0;
 
-	uint64_t allocRequestCount;
-	uint64_t allocRequestSize;
+	uint64_t allocRequestCount = 0;
+	uint64_t allocRequestSize = 0;
 
-	uint64_t deallocRequestCount;
-	uint64_t deallocRequestSize;
+	uint64_t deallocRequestCount = 0;
+	uint64_t deallocRequestSize = 0;
 
 	void printStats()
 	{
@@ -317,6 +322,23 @@ public:
 	void printStats()
 	{
 		stats.printStats();
+	}
+
+	void* AllocateAddressSpace(size_t size)
+	{
+		return VirtualMemory::AllocateAddressSpace( size );
+	}
+	void* CommitMemory(void* addr, size_t size)
+	{
+		return VirtualMemory::CommitMemory( addr, size);
+	}
+	void DecommitMemory(void* addr, size_t size)
+	{
+		VirtualMemory::DecommitMemory( addr, size );
+	}
+	void FreeAddressSpace(void* addr, size_t size)
+	{
+		VirtualMemory::FreeAddressSpace( addr, size );
 	}
 };
 
@@ -460,6 +482,29 @@ public:
 	void printStats()
 	{
 		stats.printStats();
+	}
+
+	void* AllocateAddressSpace(size_t size)
+	{
+		return VirtualMemory::AllocateAddressSpace( size );
+	}
+	void* CommitMemory(void* addr, size_t size)
+	{
+		stats.registerAllocRequest( size );
+		void* ret = VirtualMemory::CommitMemory( addr, size);
+		if (ret == (void*)(-1))
+		{
+			printf( "Committing failed at %zd (%zx) (0x%zx bytes in total)\n", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
+		}
+		return ret;
+	}
+	void DecommitMemory(void* addr, size_t size)
+	{
+		VirtualMemory::DecommitMemory( addr, size );
+	}
+	void FreeAddressSpace(void* addr, size_t size)
+	{
+		VirtualMemory::FreeAddressSpace( addr, size );
 	}
 };
 

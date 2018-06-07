@@ -220,7 +220,8 @@ public:
 		this->setBucketKind(Kind);
 
 		assert(bucketSize >= sizeof(void*));
-		this->bucketSize = bucketSize;
+		assert(bucketSize <= UINT16_MAX); // see current type of this->bucketSize
+		this->bucketSize = (uint16_t)bucketSize;
 		this->bucketSizeIndex = bckSzIndex;
 		this->usedBucketCount = 0;
 //		this->bucketsBegin = bucketsBegin;
@@ -229,12 +230,14 @@ public:
 //		this->freeBuckets = totalBuckets;
 
 		// free list initialization
-		this->freeBucketList = bucketsBegin;
+		assert(bucketsBegin <= UINT32_MAX); // see current type of this->freeBucketList
+		this->freeBucketList = (uint32_t)bucketsBegin;
 		
 		size_t bucketsEnd = bucketsBegin + bucketsCount * bucketSize;
 
+		assert(bucketsBegin + bucketsEnd - bucketSize <= UINT32_MAX); // see below
 		for (size_t i = bucketsBegin; i<(bucketsEnd - bucketSize); i += bucketSize)
-			*reinterpret_cast<uint32_t*>(begin + i) = i + bucketSize;
+			*reinterpret_cast<uint32_t*>(begin + i) = (uint32_t)(i + bucketSize);
 
 		*reinterpret_cast<uint32_t*>(begin + bucketsEnd - bucketSize) = 0;
 		assert(freeBucketList < bucketsBegin + bucketsCount * bucketSize);

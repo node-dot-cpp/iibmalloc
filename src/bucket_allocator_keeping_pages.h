@@ -469,7 +469,7 @@ public:
 			size_t offsetInPage = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::getOffsetInPage( ptr );
 			if ( offsetInPage > alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
 			{
-				uint8_t idx = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::addressToIdx( ptr );
+				size_t idx = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::addressToIdx( ptr );
 				*reinterpret_cast<void**>( ptr ) = buckets[idx];
 				buckets[idx] = ptr;
 			}

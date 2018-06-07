@@ -1687,46 +1687,64 @@ void* runRandomTest( void* params )
 			}
 			break;
 		}
-		case USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:
+		case USE_RANDOMPOS_RANDOMSIZE:
 		{
 			switch ( testParams->startupParams.allocatorType )
 			{
-#if 0
-				case USE_PER_THREAD_ALLOCATOR:
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocator() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess_UsingPerThreadAllocatorExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResPerThreadAlloc );
-					break;
-				case USE_NEW_DELETE:
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_UsingNewAndDelete() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess_UsingNewAndDeleteExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResNewDel );
-					break;
-				case USE_EMPTY_TEST:
-					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess_Empty() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess_EmptyExp( testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID, testParams->threadResEmpty );
-					break;
-#else
 				case USE_PER_THREAD_ALLOCATOR:
 				{
 					PerThreadAllocatorUnderTest allocator( testParams->threadResPerThreadAlloc );
 					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess UsingPerThreadAllocator() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+					switch ( testParams->startupParams.mat )
+					{
+						case MEM_ACCESS_TYPE::none:
+							randomPos_RandomSize<PerThreadAllocatorUnderTest,MEM_ACCESS_TYPE::none>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::full:
+							randomPos_RandomSize<PerThreadAllocatorUnderTest,MEM_ACCESS_TYPE::full>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::single:
+							randomPos_RandomSize<PerThreadAllocatorUnderTest,MEM_ACCESS_TYPE::single>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+					}
 					break;
 				}
 				case USE_NEW_DELETE:
 				{
 					NewDeleteUnderTest allocator( testParams->threadResNewDel );
 					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess UsingNewAndDelete() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+					switch ( testParams->startupParams.mat )
+					{
+						case MEM_ACCESS_TYPE::none:
+							randomPos_RandomSize<NewDeleteUnderTest,MEM_ACCESS_TYPE::none>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::full:
+							randomPos_RandomSize<NewDeleteUnderTest,MEM_ACCESS_TYPE::full>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::single:
+							randomPos_RandomSize<NewDeleteUnderTest,MEM_ACCESS_TYPE::single>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+					}
 					break;
 				}
 				case USE_EMPTY_TEST:
 				{
 					FakeAllocatorUnderTest allocator( testParams->threadResEmpty );
 					printf( "    running thread %zd with randomPos_RandomSize_FullMemAccess Empty() ...\n", testParams->threadID );
-					randomPos_RandomSize_FullMemAccess( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+					switch ( testParams->startupParams.mat )
+					{
+						case MEM_ACCESS_TYPE::none:
+							randomPos_RandomSize<FakeAllocatorUnderTest,MEM_ACCESS_TYPE::none>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::full:
+							randomPos_RandomSize<FakeAllocatorUnderTest,MEM_ACCESS_TYPE::full>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+						case MEM_ACCESS_TYPE::single:
+							randomPos_RandomSize<FakeAllocatorUnderTest,MEM_ACCESS_TYPE::single>( allocator, testParams->startupParams.iterCount, testParams->startupParams.maxItems, testParams->startupParams.maxItemSize, testParams->threadID );
+							break;
+					}
 					break;
 				}
-#endif
 				default:
 					assert( false );
 			}
@@ -1918,6 +1936,7 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 		params.testRes->cumulativeDurEmpty = 0;
 		for ( size_t i=0; i<threadCount; ++i )
 			params.testRes->cumulativeDurEmpty += params.testRes->threadResEmpty->innerDur;
+		params.testRes->cumulativeDurEmpty /= threadCount;
 	}
 
 	if ( allocatorType & USE_NEW_DELETE )
@@ -1932,6 +1951,7 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 		params.testRes->cumulativeDurNewDel = 0;
 		for ( size_t i=0; i<threadCount; ++i )
 			params.testRes->cumulativeDurNewDel += params.testRes->threadResNewDel->innerDur;
+		params.testRes->cumulativeDurNewDel /= threadCount;
 	}
 
 	if ( allocatorType & USE_PER_THREAD_ALLOCATOR )
@@ -1946,6 +1966,7 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 		params.testRes->cumulativeDurPerThreadAlloc = 0;
 		for ( size_t i=0; i<threadCount; ++i )
 			params.testRes->cumulativeDurPerThreadAlloc += params.testRes->threadResPerThreadAlloc->innerDur;
+		params.testRes->cumulativeDurPerThreadAlloc /= threadCount;
 	}
 
 	if ( allocatorType == TRY_ALL )
@@ -1976,7 +1997,8 @@ int main()
 //		params.startupParams.allocatorType = USE_EMPTY_TEST;
 //		params.startupParams.allocatorType = USE_NEW_DELETE;
 //		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
-		params.startupParams.calcMod = USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE;
+		params.startupParams.calcMod = USE_RANDOMPOS_RANDOMSIZE;
+		params.startupParams.mat = MEM_ACCESS_TYPE::full;
 
 		size_t threadCountMax = 23;
 
@@ -1987,7 +2009,7 @@ int main()
 			runComparisonTest( params );
 		}
 
-		printf( "Test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
+		printf( "Test summary for USE_RANDOMPOS_RANDOMSIZE:\n" );
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 		{
 			TestRes& tr = testRes[threadCount];
@@ -2009,15 +2031,19 @@ int main()
 		}
 		printf( "\n" );
 
-		printf( "Short test summary for USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE:\n" );
+		printf( "Short test summary for USE_RANDOMPOS_RANDOMSIZE:\n" );
 		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
 			if ( params.startupParams.allocatorType == TRY_ALL )
-			{
 				printf( "%zd,%zd,%zd,%zd,%f\n", threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc, (testRes[threadCount].durNewDel - testRes[threadCount].durEmpty) * 1. / (testRes[threadCount].durPerThreadAlloc - testRes[threadCount].durEmpty) );
-				printf( "%zd,%zd,%zd,%zd,%f\n", threadCount, testRes[threadCount].cumulativeDurEmpty, testRes[threadCount].cumulativeDurNewDel, testRes[threadCount].cumulativeDurPerThreadAlloc, (testRes[threadCount].cumulativeDurNewDel - testRes[threadCount].cumulativeDurEmpty) * 1. / (testRes[threadCount].cumulativeDurPerThreadAlloc - testRes[threadCount].cumulativeDurEmpty) );
-			}
 			else
 				printf( "%zd,%zd,%zd,%zd\n", threadCount, testRes[threadCount].durEmpty, testRes[threadCount].durNewDel, testRes[threadCount].durPerThreadAlloc );
+
+		printf( "Short test summary for USE_RANDOMPOS_RANDOMSIZE (alt computations):\n" );
+		for ( size_t threadCount=1; threadCount<=threadCountMax; ++threadCount )
+			if ( params.startupParams.allocatorType == TRY_ALL )
+				printf( "%zd,%zd,%zd,%zd,%f\n", threadCount, testRes[threadCount].cumulativeDurEmpty, testRes[threadCount].cumulativeDurNewDel, testRes[threadCount].cumulativeDurPerThreadAlloc, (testRes[threadCount].cumulativeDurNewDel - testRes[threadCount].cumulativeDurEmpty) * 1. / (testRes[threadCount].cumulativeDurPerThreadAlloc - testRes[threadCount].cumulativeDurEmpty) );
+			else
+				printf( "%zd,%zd,%zd,%zd\n", threadCount, testRes[threadCount].cumulativeDurEmpty, testRes[threadCount].cumulativeDurNewDel, testRes[threadCount].cumulativeDurPerThreadAlloc );
 	}
 
 	if( 0 )

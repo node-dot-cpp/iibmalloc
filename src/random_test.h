@@ -135,8 +135,10 @@ inline void testDistribution()
 }
 
 enum { TRY_ALL = 0xFFFFFFFF, USE_EMPTY_TEST = 0x1, USE_PER_THREAD_ALLOCATOR = 0x2, USE_NEW_DELETE = 0x4, };
-enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
+enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
 	USE_FREQUENTANDINFREQUENT_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENT_SKEWEDBINSELECTION_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_SKEWEDBINSELECTION_RANDOMUNITSIZE };
+enum MEM_ACCESS_TYPE { none, single, full };
+
 
 struct CommonTestResults
 {
@@ -232,6 +234,7 @@ struct TestStartupParams
 	size_t memReadCnt;
 	size_t iterCount;
 	size_t allocatorType;
+	MEM_ACCESS_TYPE mat;
 };
 
 struct TestStartupParamsAndResults
@@ -371,9 +374,11 @@ public:
 	}
 };
 
-template< class AllocatorUnderTest>
-void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
+template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
+void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
 {
+	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
+	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
 //	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
@@ -408,7 +413,16 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
 				baseBuff[i*32+j].sz = sz;
 				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
-				memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
+				if constexpr ( doMemAccess )
+				{
+					if constexpr ( doFullAccess )
+						memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
+					else
+					{
+						static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+						baseBuff[i*32+j].ptr[sz/2] = (uint8_t)sz;
+					}
+				}
 			}
 	}
 	allocatorUnderTest.doWhateverAfterSetupPhase();
@@ -420,12 +434,23 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 		size_t idx = randNum % maxItems;
 		if ( baseBuff[idx].ptr )
 		{
-			size_t i=0;
-			for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
-				dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
-			uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
-			for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
-				dummyCtr += tail[i];
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
 			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
 			baseBuff[idx].ptr = 0;
 		}
@@ -434,7 +459,16 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
 			baseBuff[idx].sz = sz;
 			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
-			memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+					memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					baseBuff[idx].ptr[sz/2] = (uint8_t)sz;
+				}
+			}
 		}
 	}
 	allocatorUnderTest.doWhateverAfterMainLoopPhase();
@@ -443,12 +477,23 @@ void randomPos_RandomSize_FullMemAccess( AllocatorUnderTest& allocatorUnderTest,
 	for ( size_t idx=0; idx<maxItems; ++idx )
 		if ( baseBuff[idx].ptr )
 		{
-			size_t i=0;
-			for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
-				dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
-			uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
-			for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
-				dummyCtr += tail[i];
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
 			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
 		}
 

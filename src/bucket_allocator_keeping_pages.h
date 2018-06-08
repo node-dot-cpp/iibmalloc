@@ -64,10 +64,9 @@ static_assert( 1 + BLOCK_SIZE_MASK == BLOCK_SIZE, "" );
 #define USE_SOUNDING_PAGE_ADDRESS
 
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-template<class BasePageAllocator, size_t bucket_cnt_exp>
+template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp>
 class SoundingAddressPageAllocator : public BasePageAllocator
 {
-	static constexpr size_t reservation_size_exp = 23; // that is, one-time reservation is 2^reservation_size_exp
 	static constexpr size_t reservation_size = 1 << reservation_size_exp;
 	static constexpr size_t bucket_cnt = 1 << bucket_cnt_exp;
 	static_assert( reservation_size_exp >= bucket_cnt_exp + BLOCK_SIZE_EXP, "revise implementation" );
@@ -279,7 +278,10 @@ protected:
 	};
 	
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-	SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp> pageAllocator;
+	static constexpr size_t reservation_size_exp = 23;
+	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp> PageAllocatorT;
+//	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp> PageAllocatorT;
+	PageAllocatorT pageAllocator;
 #else
 	PageAllocatorWithCaching pageAllocator;
 
@@ -363,11 +365,11 @@ public:
 	void disable() {}
 
 
-	FORCE_INLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
+	NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
 	{
 #ifdef USE_SOUNDING_PAGE_ADDRESS
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
-		constexpr size_t memStart = alignUpExp( SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+		constexpr size_t memStart = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
 #else
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( BLOCK_SIZE ) );
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
@@ -466,16 +468,16 @@ public:
 				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(ch) );
 			}
 #elif defined USE_SOUNDING_PAGE_ADDRESS
-			size_t offsetInPage = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::getOffsetInPage( ptr );
+			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
 			if ( offsetInPage > alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
 			{
-				size_t idx = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::addressToIdx( ptr );
+				size_t idx = PageAllocatorT::addressToIdx( ptr );
 				*reinterpret_cast<void**>( ptr ) = buckets[idx];
 				buckets[idx] = ptr;
 			}
 			else
 			{
-				void* pageStart = SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp>::ptrToPageStart( ptr );
+				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
 				MemoryBlockListItem* h = reinterpret_cast<MemoryBlockListItem*>(pageStart);
 				h->size = *reinterpret_cast<size_t*>(pageStart);
 				h->sizeIndex = 0xFFFFFFFF; // TODO: address properly!!!

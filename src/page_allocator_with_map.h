@@ -382,7 +382,7 @@ struct SimplifiedBucketAllocator
 		{
 			void* chk = alloc->getFreeBlock(blockSize);//alloc bucket;
 
-			BucketBlock* bb = static_cast<BucketBlock*>(chk);
+			BucketBlock* bb = new(chk) BucketBlock();
 
 			bb->initialize(bktSz, 0, bktBegin, bktCount);
 

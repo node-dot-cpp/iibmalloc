@@ -42,7 +42,7 @@
 
 #include <windows.h>
 
-thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
+//thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
 
 template< typename... ARGS >
 void allocLog(const char* formatStr, const ARGS&... args)

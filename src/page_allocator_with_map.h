@@ -679,7 +679,7 @@ public:
 
 
 	FORCE_INLINE
-	void* getFreeBlock(size_t sz)
+	void* getFreeBlockInt(size_t sz)
 	{
 
 		size_t ix = sizeToIndex(sz);
@@ -705,11 +705,19 @@ public:
 		return ptr;
 	}
 
+	void* getFreeBlock(size_t sz)
+	{
+		size_t chkSz = alignUpExp(sz, blockSizeExp);
+
+		return getFreeBlockInt(chkSz);
+	}
+
+
 	FORCE_INLINE
 		MemoryBlockListItem* getBucketBlock(size_t sz)
 	{
 		//returns a block with alignment requirements to make buckets
-		void* ptr = getFreeBlock(sz);
+		void* ptr = getFreeBlockInt(sz);
 		MemoryBlockListItem* item = new(ptr) MemoryBlockListItem();
 		item->initialize(0, 0);
 

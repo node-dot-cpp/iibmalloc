@@ -61,62 +61,9 @@ static union
 } SerializableAllocatorMagic;
 
 
-struct Chunk :public MemoryBlockListItem
-{
-	//TODO consider merging all in a single byte
-	uint8_t inUse;
-//	uint8_t last;
-
-	enum BucketKinds :uint8_t
-	{
-		Free = 0,
-		NoBucket,
-		SmallBucket,
-		MediumBucket
-	} bucketKind;
 
 
-	void initialize()
-	{
-		bucketKind = Free;
-	}
-
-	bool isFree() const {return bucketKind == Free;}
-	void setFree() { bucketKind = Free;}
-	void setInUse() { bucketKind = NoBucket;}
-
-
-	BucketKinds getBucketKind() const { return bucketKind; }
-	void setBucketKind(BucketKinds kind) { bucketKind = kind; }
-
-	//bool noFlags() const { return isFree() && getBucketKind() == NoBucket; }
-	//void clearFlags() { clearInUse(); setBucketKind(NoBucket); }
-
-
-	//void updateAfterSize(size_t sz)
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + sz;
-	//	reinterpret_cast<Chunk*>(ptr)->setSizeBefore(sz);
-	//}
-	
-
-	
-	//Chunk* getBefore()
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) - sizeBefore;
-	//	return sizeBefore != 0 ? reinterpret_cast<Chunk*>(ptr) : nullptr;
-	//}
-
-	//Chunk* getAfter()
-	//{
-	//	uintptr_t ptr = reinterpret_cast<uintptr_t>(this) + getSize();
-	//	return reinterpret_cast<Chunk*>(ptr);
-	//}
-
-};
-
-
-struct BucketBlockV2 : Chunk
+struct BucketBlockV2 : MemoryBlockListItem
 {
 private:
 	size_t bucketSize = 0;
@@ -204,7 +151,7 @@ public:
 
 
 template<uint8_t SIZE_EXP>
-struct BucketBlockV4 : Chunk
+struct BucketBlockV4 : MemoryBlockListItem
 {
 private:
 	size_t bucketSize = 0;
@@ -315,8 +262,8 @@ static_assert( ( 1 << ALIGNMENT_EXP ) == ALIGNMENT, "" );
 constexpr size_t ALIGNMENT_MASK = expToMask(ALIGNMENT_EXP);
 static_assert( 1 + ALIGNMENT_MASK == ALIGNMENT, "" );
 
-constexpr size_t MIN_CHUNK_SIZE = alignUpExp(sizeof(Chunk), ALIGNMENT_EXP);
-constexpr size_t MAX_CHUNK_SIZE = alignDownExp(std::numeric_limits<Chunk::SizeT>::max(), ALIGNMENT_EXP);
+constexpr size_t MIN_CHUNK_SIZE = alignUpExp(sizeof(MemoryBlockListItem), ALIGNMENT_EXP);
+constexpr size_t MAX_CHUNK_SIZE = alignDownExp(std::numeric_limits<MemoryBlockListItem::SizeT>::max(), ALIGNMENT_EXP);
 
 constexpr size_t BLOCK_SIZE = 4 * 1024;
 constexpr uint8_t BLOCK_SIZE_EXP = sizeToExp(BLOCK_SIZE);
@@ -339,7 +286,7 @@ static_assert(COMMIT_CHUNK_MULTIPLIER >= 1, "");
 constexpr size_t FIRST_BUCKET_ALIGNMENT = 64;
 constexpr uint8_t FIRST_BUCKET_ALIGNMENT_EXP = sizeToExp(FIRST_BUCKET_ALIGNMENT);
 
-constexpr size_t CHUNK_OVERHEAD = alignUpExp(sizeof(Chunk), FIRST_BUCKET_ALIGNMENT_EXP);
+//constexpr size_t CHUNK_OVERHEAD = alignUpExp(sizeof(Chunk), FIRST_BUCKET_ALIGNMENT_EXP);
 
 
 
@@ -557,7 +504,7 @@ struct HeapManager
 	{
 		if (!bl.partials.empty())
 		{
-			Chunk* chk = static_cast<Chunk*>(bl.partials.front());
+			MemoryBlockListItem* chk = bl.partials.front();
 			BUCKET* bb = static_cast<BUCKET*>(chk);
 			assert(chk->getBucketKind() == BUCKET::Kind);
 			//assert(sz <= bb->getBucketSize());
@@ -573,7 +520,7 @@ struct HeapManager
 		}
 		else if (!bl.emptys.empty())
 		{
-			Chunk* chk = static_cast<Chunk*>(bl.emptys.front());
+			MemoryBlockListItem* chk = bl.emptys.front();
 			assert(chk->getBucketKind() == BUCKET::Kind);
 			BUCKET* bb = static_cast<BUCKET*>(chk);
 			//assert(sz <= bb->getBucketSize());
@@ -592,29 +539,11 @@ struct HeapManager
 		}
 	}
 
-
-	//NOINLINE void* allocate2ForLargeSize(size_t sz)
-	//{
-	//	//		constexpr size_t overhead = alignUpExp(sizeof(Chunk), FIRST_BUCKET_ALIGNMENT_EXP);
-	//	constexpr size_t overhead = alignUpExp(CM::CHUNK_OVERHEAD, FIRST_BUCKET_ALIGNMENT_EXP);
-
-	//	size_t chkSz = alignUpExp(sz + overhead, blockSizeExp);
-	//	Chunk* chk = reinterpret_cast<Chunk*>(freeChunks.getFreeBlock(chkSz));//alloc bucket;
-	//	chk->setBucketKind(Chunk::NoBucket);
-
-	//	usedNonBuckets.pushFront(chk);
-	//	return reinterpret_cast<uint8_t*>(chk) + overhead;
-	//}
-
 	NOINLINE void* allocate2ForLargeSize(size_t sz)
 	{
-		size_t chkSz = alignUpExp(sz, blockSizeExp);
-		void* ptr = freeChunks.getFreeBlock(chkSz);
+		void* ptr = freeChunks.getFreeBlock(sz);
 		freeChunks.doHouseKeeping();
 
-//		chk->setBucketKind(Chunk::NoBucket);
-
-//		usedNonBuckets.pushFront(chk);
 		return ptr;
 	}
 
@@ -658,10 +587,12 @@ struct HeapManager
 	}
 
 	FORCE_INLINE
-	Chunk* getChunkFromUsrPtr(void* ptr)
+		MemoryBlockListItem* getBlockFromUsrPtr(void* ptr)
 	{
-		return reinterpret_cast<Chunk*>(alignDownExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
+		return reinterpret_cast<MemoryBlockListItem*>(alignDownExp(reinterpret_cast<uintptr_t>(ptr), blockSizeExp));
 	}
+
+
 
 	template<class BUCKET>
 	NOINLINE
@@ -678,7 +609,7 @@ struct HeapManager
 		else if (isEmpty)
 		{
 			bucketBlocks[ix].partials.remove(bb);
-			if(bucketBlocks[ix].emptys.size() < KEEP_EMPTY_BUCKETS)
+			if (bucketBlocks[ix].emptys.size() < KEEP_EMPTY_BUCKETS)
 				bucketBlocks[ix].emptys.pushFront(bb);
 			else
 			{
@@ -687,6 +618,14 @@ struct HeapManager
 			}
 		}
 	}
+
+	NOINLINE
+		void deallocateFullBlock(void* ptr)
+	{
+		freeChunks.freeChunk(ptr);
+		freeChunks.doHouseKeeping();
+	}
+
 
 	FORCE_INLINE void deallocate(void* ptr)
 	{
@@ -701,8 +640,8 @@ struct HeapManager
 		if (isBucketPtr(ptr))
 		{
 			//its a bucket
-			Chunk* chk = getChunkFromUsrPtr(ptr);
 			//		assert(!chk->isFree());
+			MemoryBlockListItem* chk = getBlockFromUsrPtr(ptr);
 			auto kind = chk->getBucketKind();
 			if (kind == SmallBucketBlock::Kind)
 			{
@@ -722,15 +661,13 @@ struct HeapManager
 				if (wasFull || bb->isEmpty())
 					finalizeChuckDeallocationSpecialCases(bb, wasFull, bb->isEmpty());
 			}
+			else if (kind == MemoryBlockListItem::NoBucket)
+				deallocateFullBlock(chk);
 			else
 				assert(false);
 		}
 		else
-		{
-			//its a full page allocation
-			freeChunks.freeChunk(ptr);
-			freeChunks.doHouseKeeping();
-		}
+			deallocateFullBlock(ptr);
 	}
 
 	void printStats()
@@ -785,6 +722,7 @@ struct HeapManager
 };
 
 //typedef HeapManager<BucketSizes2, PageAllocator> Heap;
+//typedef HeapManager<BucketSizes2, PageAllocatorWithCaching> Heap;
 typedef HeapManager<BucketSizes2, PageAllocatorWithDescriptorHashMap> Heap;
 
 class SerializableAllocatorBase

@@ -42,7 +42,7 @@
 
 #include <windows.h>
 
-thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
+//thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
 
 template< typename... ARGS >
 void allocLog(const char* formatStr, const ARGS&... args)
@@ -134,7 +134,5 @@ void* VirtualMemory::allocate(size_t size)
 void VirtualMemory::deallocate(void* ptr, size_t size)
 {
 	bool OK = VirtualFree(ptr, 0, MEM_RELEASE);
-//	bool OK = VirtualFree(ptr, size, MEM_RELEASE);
 	assert( OK );
 }
-

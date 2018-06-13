@@ -112,6 +112,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		pb->blockAddress = getNextBlock();
 //printf( "createNextBlockAndGetPage(): descriptor allocated at 0x%zx; block = 0x%zx\n", (size_t)(pb), (size_t)(pb->blockAddress) );
 		memset( pb->nextToUse, 0, sizeof( uint16_t) * bucket_cnt );
+		memset( pb->nextToCommit, 0, sizeof( uint16_t) * bucket_cnt );
 		pb->next = nullptr;
 		pageBlockListCurrent->next = pb;
 		pageBlockListCurrent = pb;
@@ -319,8 +320,8 @@ protected:
 	
 #ifdef USE_SOUNDING_PAGE_ADDRESS
 	static constexpr size_t reservation_size_exp = 23;
-//	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp> PageAllocatorT;
-	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
+	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
+//	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 	PageAllocatorT pageAllocator;
 #else
 	PageAllocatorWithCaching pageAllocator;

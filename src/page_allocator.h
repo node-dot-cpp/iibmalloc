@@ -156,6 +156,12 @@ public:
 	
 	MemoryBlockList()
 	{
+		initialize();
+	}
+
+	void initialize()
+	{
+		count = 0;
 		lst.listInitializeEmpty();
 	}
 
@@ -363,6 +369,8 @@ public:
 	void initialize(uint8_t blockSizeExp)
 	{
 		this->blockSizeExp = blockSizeExp;
+		for ( size_t ix=0; ix<=max_cached_size; ++ ix )
+			freeBlocks[ix].initialize();
 	}
 
 	void deinitialize()

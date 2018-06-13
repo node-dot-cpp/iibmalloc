@@ -373,6 +373,55 @@ public:
 	}
 };
 
+constexpr double Pareto_80_20_6[7] = {
+	0.262144000000,
+	0.393216000000,
+	0.245760000000,
+	0.081920000000,
+	0.015360000000,
+	0.001536000000,
+	0.000064000000};
+
+struct Pareto_80_20_6_Data
+{
+	uint32_t probabilityRanges[6];
+	uint32_t offsets[8];
+};
+
+FORCE_INLINE
+void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
+{
+	data.probabilityRanges[0] = UINT32_MAX * Pareto_80_20_6[0];
+	data.probabilityRanges[6] = UINT32_MAX * (1. - Pareto_80_20_6[6]);
+	for ( size_t i=1; i<5; ++i )
+		data.probabilityRanges[i] = data.probabilityRanges[i-1] + UINT32_MAX * Pareto_80_20_6[i];
+	data.offsets[0] = 0;
+	data.offsets[8] = itemCount;
+	for ( size_t i=0; i<6; ++i )
+		data.offsets[i+1] = data.offsets[i] + itemCount * Pareto_80_20_6[6-i];
+}
+
+FORCE_INLINE
+size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rangeSelectionRand, uint32_t offsetRand )
+{
+	size_t idx = 6;
+	if ( rangeSelectionRand < data.probabilityRanges[0] )
+		idx = 0;
+	else if ( rangeSelectionRand < data.probabilityRanges[1] )
+		idx = 1;
+	else if ( rangeSelectionRand < data.probabilityRanges[2] )
+		idx = 2;
+	else if ( rangeSelectionRand < data.probabilityRanges[3] )
+		idx = 3;
+	else if ( rangeSelectionRand < data.probabilityRanges[4] )
+		idx = 4;
+	else if ( rangeSelectionRand < data.probabilityRanges[5] )
+		idx = 5;
+	uint32_t rangeSize = data.offsets[ idx + 1 ] - data.offsets[ idx ];
+	uint32_t offsetInRange = offsetRand % rangeSize;
+	return data.offsets[ idx ] + offsetInRange;
+}
+
 template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
 void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
 {

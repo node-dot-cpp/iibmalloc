@@ -53,25 +53,30 @@ static_assert( ( 1 << ALIGNMENT_EXP ) == ALIGNMENT, "" );
 constexpr size_t ALIGNMENT_MASK = expToMask(ALIGNMENT_EXP);
 static_assert( 1 + ALIGNMENT_MASK == ALIGNMENT, "" );
 
-constexpr size_t BLOCK_SIZE = 4 * 1024;
-constexpr uint8_t BLOCK_SIZE_EXP = sizeToExp(BLOCK_SIZE);
-constexpr size_t BLOCK_SIZE_MASK = expToMask(BLOCK_SIZE_EXP);
-static_assert( ( 1 << BLOCK_SIZE_EXP ) == BLOCK_SIZE, "" );
-static_assert( 1 + BLOCK_SIZE_MASK == BLOCK_SIZE, "" );
+constexpr size_t PAGE_SIZE = 4 * 1024;
+constexpr uint8_t PAGE_SIZE_EXP = sizeToExp(PAGE_SIZE);
+constexpr size_t PAGE_SIZE_MASK = expToMask(PAGE_SIZE_EXP);
+static_assert( ( 1 << PAGE_SIZE_EXP ) == PAGE_SIZE, "" );
+static_assert( 1 + PAGE_SIZE_MASK == PAGE_SIZE, "" );
 
 
 //#define USE_ITEM_HEADER
 #define USE_SOUNDING_PAGE_ADDRESS
 
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp>
+template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp, size_t commit_page_cnt_exp>
 class SoundingAddressPageAllocator : public BasePageAllocator
 {
-	static constexpr size_t reservation_size = 1 << reservation_size_exp;
-	static constexpr size_t bucket_cnt = 1 << bucket_cnt_exp;
-	static_assert( reservation_size_exp >= bucket_cnt_exp + BLOCK_SIZE_EXP, "revise implementation" );
-	static constexpr size_t pages_per_bucket_exp = reservation_size_exp - bucket_cnt_exp - BLOCK_SIZE_EXP;
-	static constexpr size_t pages_per_bucket = 1 << pages_per_bucket_exp;
+	static constexpr size_t reservation_size = (1 << reservation_size_exp);
+	static constexpr size_t bucket_cnt = (1 << bucket_cnt_exp);
+	static_assert( reservation_size_exp >= bucket_cnt_exp + PAGE_SIZE_EXP, "revise implementation" );
+	static constexpr size_t pages_per_bucket_exp = reservation_size_exp - bucket_cnt_exp - PAGE_SIZE_EXP;
+	static constexpr size_t pages_in_single_commit_exp = (pages_per_bucket_exp >= 1 ? pages_per_bucket_exp - 1 : 0);
+	static constexpr size_t pages_in_single_commit = (1 << pages_in_single_commit_exp);
+	static constexpr size_t pages_per_bucket = (1 << pages_per_bucket_exp);
+	static constexpr size_t commit_page_cnt = (1 << commit_page_cnt_exp);
+	static constexpr size_t commit_size = (1 << (commit_page_cnt_exp + PAGE_SIZE_EXP));
+	static_assert( commit_page_cnt_exp <= reservation_size_exp - bucket_cnt_exp - PAGE_SIZE_EXP, "value mismatch" );
 
 	struct MemoryBlockHeader
 	{
@@ -86,6 +91,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		void* blockAddress = nullptr;
 //		size_t usageMask = 0;
 		uint16_t nextToUse[ bucket_cnt ];
+		uint16_t nextToCommit[ bucket_cnt ];
 //		static_assert( sizeof( size_t ) * 8 >= bucket_cnt, "revise implementation" );
 		static_assert( UINT16_MAX > pages_per_bucket , "revise implementation" );
 	};
@@ -95,12 +101,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 
 	void* getNextBlock()
 	{
-//		void* pages = this->getFreeBlockNoCache( BLOCK_SIZE * bucket_cnt ); // TODO: replace by reservation, if possible
-//		void* pages = this->AllocateAddressSpace( BLOCK_SIZE * bucket_cnt );
 		void* pages = this->AllocateAddressSpace( reservation_size );
-//		MemoryBlockHeader* h = reinterpret_cast<MemoryBlockHeader*>( pages );
-//		h->next = memoryBlockHead;
-//		memoryBlockHead = h;
 		return pages;
 	}
 
@@ -110,17 +111,19 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		PageBlockDescriptor* pb = new PageBlockDescriptor; // TODO: consider using our own allocator
 		pb->blockAddress = getNextBlock();
 //printf( "createNextBlockAndGetPage(): descriptor allocated at 0x%zx; block = 0x%zx\n", (size_t)(pb), (size_t)(pb->blockAddress) );
-//		pb->usageMask = ((size_t)1) << reasonIdx;
 		memset( pb->nextToUse, 0, sizeof( uint16_t) * bucket_cnt );
 		pb->next = nullptr;
-		pb->nextToUse[ reasonIdx ] = 1;
 		pageBlockListCurrent->next = pb;
 		pageBlockListCurrent = pb;
 //		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx );
 		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx, 0 );
 //	printf("createNextBlockAndGetPage(): before commit, %zd, 0x%zx -> 0x%zx\n", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
-//		void* ret2 = this->CommitMemory( ret, BLOCK_SIZE );
-		this->CommitMemory( ret, BLOCK_SIZE );
+//		void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
+//		this->CommitMemory( ret, PAGE_SIZE );
+		commitRangeOfPageIndexes( pb->blockAddress, reasonIdx, 0, commit_page_cnt );
+		pb->nextToUse[ reasonIdx ] = 1;
+		static_assert( commit_page_cnt <= UINT16_MAX, "" );
+		pb->nextToCommit[ reasonIdx ] = (uint16_t)commit_page_cnt;
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 //	printf("createNextBlockAndGetPage(): after commit 0x%zx\n", (size_t)(ret2) );
 		return ret;
@@ -132,6 +135,8 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 //		pageBlockListStart.usageMask = 0;
 		for ( size_t i=0; i<bucket_cnt; ++i )
 			pageBlockListStart.nextToUse[i] = pages_per_bucket; // thus triggering switching to a next block whatever bucket is selected
+		for ( size_t i=0; i<bucket_cnt; ++i )
+			pageBlockListStart.nextToCommit[i] = pages_per_bucket; // thus triggering switching to a next block whatever bucket is selected
 		pageBlockListStart.next = nullptr;
 
 		pageBlockListCurrent = &pageBlockListStart;
@@ -146,12 +151,12 @@ public:
 //	SoundingAddressPageAllocator( BasePageAllocator& pageAllocator_ ) : pageAllocator( pageAllocator_ ) {}
 	SoundingAddressPageAllocator() {}
 
-//	static FORCE_INLINE size_t addressToIdx( void* ptr ) { return ( (uintptr_t)(ptr) >> BLOCK_SIZE_EXP ) & ( bucket_cnt - 1 ); }
+//	static FORCE_INLINE size_t addressToIdx( void* ptr ) { return ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) & ( bucket_cnt - 1 ); }
 //	static FORCE_INLINE size_t addressToIdx( void* ptr ) { return ( (uintptr_t)(ptr) >> (reservation_size_exp - bucket_cnt_exp) ) & ( bucket_cnt - 1 ); }
 	static FORCE_INLINE size_t addressToIdx( void* ptr ) 
 	{ 
 		// TODO: make sure computations are optimal
-		uintptr_t padr = (uintptr_t)(ptr) >> BLOCK_SIZE_EXP;
+		uintptr_t padr = (uintptr_t)(ptr) >> PAGE_SIZE_EXP;
 		constexpr uintptr_t meaningfulBitsMask = ( 1 << (bucket_cnt_exp + pages_per_bucket_exp) ) - 1;
 		uintptr_t meaningfulBits = padr & meaningfulBitsMask;
 		return meaningfulBits >> pages_per_bucket_exp;
@@ -160,7 +165,7 @@ public:
 	{ 
 		assert( idx < bucket_cnt );
 		uintptr_t startAsIdx = addressToIdx( blockptr );
-		void* ret = (void*)( ( ( ( (uintptr_t)(blockptr) >> ( BLOCK_SIZE_EXP + bucket_cnt_exp ) ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << BLOCK_SIZE_EXP );
+		void* ret = (void*)( ( ( ( (uintptr_t)(blockptr) >> ( PAGE_SIZE_EXP + bucket_cnt_exp ) ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << PAGE_SIZE_EXP );
 		assert( addressToIdx( ret ) == idx );
 		return ret;
 	}*/
@@ -168,31 +173,54 @@ public:
 	{ 
 		assert( idx < bucket_cnt );
 		uintptr_t startAsIdx = addressToIdx( blockptr );
-		assert( ( (uintptr_t)(blockptr) & BLOCK_SIZE_MASK ) == 0 );
-		uintptr_t startingPage =  (uintptr_t)(blockptr) >> BLOCK_SIZE_EXP;
-		uintptr_t basePage =  ( startingPage >> (reservation_size_exp - BLOCK_SIZE_EXP) ) << (reservation_size_exp - BLOCK_SIZE_EXP);
+		assert( ( (uintptr_t)(blockptr) & PAGE_SIZE_MASK ) == 0 );
+		uintptr_t startingPage =  (uintptr_t)(blockptr) >> PAGE_SIZE_EXP;
+		uintptr_t basePage =  ( startingPage >> (reservation_size_exp - PAGE_SIZE_EXP) ) << (reservation_size_exp - PAGE_SIZE_EXP);
 		uintptr_t baseOffset = startingPage - basePage;
 //		uintptr_t stepOffset = baseOffset & (pages_per_bucket - 1);
 //		bool below = pagesUsed < stepOffset;
 		bool below = (idx << pages_per_bucket_exp) + pagesUsed < baseOffset;
 		uintptr_t ret = basePage + (idx << pages_per_bucket_exp) + pagesUsed + (below << (pages_per_bucket_exp + bucket_cnt_exp));
-		ret <<= BLOCK_SIZE_EXP;
+		ret <<= PAGE_SIZE_EXP;
 		assert( addressToIdx( (void*)( ret ) ) == idx );
 		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
 		return (void*)( ret );
 
-/*		void* ret = (void*)( ( ( ( ( (uintptr_t)(blockptr) >> reservation_size_exp ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << ( reservation_size_exp - bucket_cnt_exp ) ) + ( pagesUsed << BLOCK_SIZE_EXP ) );
+/*		void* ret = (void*)( ( ( ( ( (uintptr_t)(blockptr) >> reservation_size_exp ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << ( reservation_size_exp - bucket_cnt_exp ) ) + ( pagesUsed << PAGE_SIZE_EXP ) );
 		assert( addressToIdx( ret ) == idx );
 		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
 		return ret;*/
 	}
-	static FORCE_INLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & BLOCK_SIZE_MASK; }
-	static FORCE_INLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> BLOCK_SIZE_EXP ) << BLOCK_SIZE_EXP ); }
+	static FORCE_INLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
+	static FORCE_INLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
 
 	void initialize( uint8_t blockSizeExp )
 	{
 		BasePageAllocator::initialize( blockSizeExp );
 		resetLists();
+	}
+
+	void commitRangeOfPageIndexes( void* blockptr, size_t bucketIdx, size_t pageIdx, size_t rangeSize )
+	{
+		uint8_t* start = reinterpret_cast<uint8_t*>( idxToPageAddr( blockptr, bucketIdx, pageIdx ) );
+		uint8_t* prevNext = start;
+		uint8_t* next;
+		for ( size_t i=1; i<rangeSize; ++i )
+		{
+			next = reinterpret_cast<uint8_t*>( idxToPageAddr( blockptr, bucketIdx, pageIdx + i ) );
+			if ( next - prevNext == PAGE_SIZE )
+			{
+				prevNext = next;
+				continue;
+			}
+			else
+			{
+				this->CommitMemory( start, prevNext - start + PAGE_SIZE );
+				start = next;
+				prevNext = next;
+			}
+		}
+		this->CommitMemory( start, prevNext - start + PAGE_SIZE );
 	}
 
 	void* getPage( size_t idx )
@@ -201,9 +229,16 @@ public:
 		assert( indexHead[idx] );
 		if ( indexHead[idx]->nextToUse[idx] < pages_per_bucket )
 		{
+			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
+			if ( indexHead[idx]->nextToUse[idx] == indexHead[idx]->nextToCommit[idx] )
+			{
+				commitRangeOfPageIndexes( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToCommit[idx], commit_page_cnt );
+				indexHead[idx]->nextToCommit[ idx ] += commit_page_cnt;
+			}
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
 			++(indexHead[idx]->nextToUse[idx]);
-			this->CommitMemory( ret, BLOCK_SIZE );
+			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
+//			this->CommitMemory( ret, PAGE_SIZE );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
@@ -221,15 +256,20 @@ public:
 			indexHead[idx] = indexHead[idx]->next;
 			assert( indexHead[idx]->blockAddress );
 //			assert( ( indexHead[idx]->usageMask & ( ((size_t)1) << idx ) ) == 0 );
-			assert( indexHead[idx]->nextToUse[idx] == 0 );
 //			indexHead[idx]->usageMask |= ((size_t)1) << idx;
 //			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx );
+			assert( indexHead[idx]->nextToUse[idx] == 0 );
+			assert( indexHead[idx]->nextToCommit[idx] == 0 );
+			if ( indexHead[idx]->nextToUse[idx] == indexHead[idx]->nextToCommit[idx] )
+			commitRangeOfPageIndexes( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToCommit[idx], commit_page_cnt );
+			indexHead[idx]->nextToCommit[idx] = commit_page_cnt;
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
-			++(indexHead[idx]->nextToUse[idx]);
+			indexHead[idx]->nextToUse[idx] = 1;
+			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
 //	printf("getPage(): before commit, %zd, 0x%zx -> 0x%zx\n", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
-//			void* ret2 = this->CommitMemory( ret, BLOCK_SIZE );
+//			void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
 //	printf("getPage(): after commit 0x%zx\n", (size_t)(ret2) );
-			this->CommitMemory( ret, BLOCK_SIZE );
+//			this->CommitMemory( ret, PAGE_SIZE );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
@@ -247,7 +287,7 @@ public:
 		PageBlockDescriptor* next = pageBlockListStart.next;
 		while( next )
 		{
-//printf( "in block 0x%zx about to delete 0x%zx of size 0x%zx\n", (size_t)( next ), (size_t)( next->blockAddress ), BLOCK_SIZE * bucket_cnt );
+//printf( "in block 0x%zx about to delete 0x%zx of size 0x%zx\n", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
 			assert( next->blockAddress );
 			this->freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), reservation_size );
 			PageBlockDescriptor* tmp = next->next;
@@ -264,8 +304,8 @@ public:
 class SerializableAllocatorBase
 {
 protected:
-	static constexpr size_t MaxBucketSize = BLOCK_SIZE / 4;
-	static constexpr size_t BucketCountExp = 4;
+	static constexpr size_t MaxBucketSize = PAGE_SIZE / 16;
+	static constexpr size_t BucketCountExp = 3;
 	static constexpr size_t BucketCount = 1 << BucketCountExp;
 	void* buckets[BucketCount];
 	static constexpr size_t large_block_idx = 0xFF;
@@ -279,8 +319,8 @@ protected:
 	
 #ifdef USE_SOUNDING_PAGE_ADDRESS
 	static constexpr size_t reservation_size_exp = 23;
-	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp> PageAllocatorT;
-//	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp> PageAllocatorT;
+//	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp> PageAllocatorT;
+	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 	PageAllocatorT pageAllocator;
 #else
 	PageAllocatorWithCaching pageAllocator;
@@ -290,7 +330,7 @@ protected:
 	FORCE_INLINE
 	ChunkHeader* getChunkFromUsrPtr(void* ptr)
 	{
-		return reinterpret_cast<ChunkHeader*>(alignDownExp(reinterpret_cast<uintptr_t>(ptr), BLOCK_SIZE_EXP));
+		return reinterpret_cast<ChunkHeader*>(alignDownExp(reinterpret_cast<uintptr_t>(ptr), PAGE_SIZE_EXP));
 	}
 #endif
 
@@ -371,7 +411,7 @@ public:
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
 		constexpr size_t memStart = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
 #else
-		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( BLOCK_SIZE ) );
+		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( PAGE_SIZE ) );
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 		ChunkHeader* h = reinterpret_cast<ChunkHeader*>( block );
 		h->idx = szidx;
@@ -384,7 +424,7 @@ public:
 #ifdef USE_ITEM_HEADER
 		bucketSz += sizeof(ItemHeader);
 #endif // USE_ITEM_HEADER
-		size_t itemCnt = (BLOCK_SIZE - memStart) / bucketSz;
+		size_t itemCnt = (PAGE_SIZE - memStart) / bucketSz;
 		assert( itemCnt );
 		for ( size_t i=bucketSz; i<(itemCnt-1)*bucketSz; i+=bucketSz )
 			*reinterpret_cast<void**>(mem + i) = mem + i + bucketSz;
@@ -407,7 +447,7 @@ public:
 #else
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 #endif // USE_ITEM_HEADER
-		size_t fullSz = alignUpExp( sz + memStart, BLOCK_SIZE_EXP );
+		size_t fullSz = alignUpExp( sz + memStart, PAGE_SIZE_EXP );
 		MemoryBlockListItem* block = pageAllocator.getFreeBlock( fullSz );
 
 #ifdef USE_ITEM_HEADER
@@ -513,7 +553,7 @@ public:
 	void initialize()
 	{
 		memset( buckets, 0, sizeof( void* ) * BucketCount );
-		pageAllocator.initialize( BLOCK_SIZE_EXP );
+		pageAllocator.initialize( PAGE_SIZE_EXP );
 	}
 
 	void deinitialize()

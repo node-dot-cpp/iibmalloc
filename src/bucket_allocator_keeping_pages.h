@@ -453,8 +453,10 @@ public:
 
 #ifdef USE_ITEM_HEADER
 #else
+		size_t allocatedSz = ( reinterpret_cast<MemoryBlockListItem*>( block ) )->getSize();
 		size_t* h = reinterpret_cast<size_t*>( block );
-		*h = sz;
+//		*h = sz;
+		*h = allocatedSz;
 #endif
 
 //		usedNonBuckets.pushFront(chk);

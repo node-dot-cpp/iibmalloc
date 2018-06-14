@@ -392,7 +392,7 @@ FORCE_INLINE
 void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 {
 	data.probabilityRanges[0] = (uint32_t)(UINT32_MAX * Pareto_80_20_6[0]);
-	data.probabilityRanges[6] = (uint32_t)(UINT32_MAX * (1. - Pareto_80_20_6[6]));
+	data.probabilityRanges[5] = (uint32_t)(UINT32_MAX * (1. - Pareto_80_20_6[6]));
 	for ( size_t i=1; i<5; ++i )
 		data.probabilityRanges[i] = data.probabilityRanges[i-1] + (uint32_t)(UINT32_MAX * Pareto_80_20_6[i]);
 	data.offsets[0] = 0;

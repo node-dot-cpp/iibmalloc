@@ -96,7 +96,7 @@ void* VirtualMemory::allocate(size_t size)
 
 void VirtualMemory::deallocate(void* ptr, size_t size)
 {
-	assert( size == 4096 );
+	assert( size % 4096 == 0 );
 	int ret = munmap(ptr, size);
 	assert( ret == 0 );
 }

@@ -68,6 +68,11 @@ public:
 	static void* allocate(size_t size);
 	static void deallocate(void* ptr, size_t size);
 //	static void release(void* addr);
+
+	static void* AllocateAddressSpace(size_t size);
+	static void* CommitMemory(void* addr, size_t size);
+	static void DecommitMemory(void* addr, size_t size);
+	static void FreeAddressSpace(void* addr, size_t size);
 };
 
 struct MemoryBlockListItem
@@ -166,6 +171,12 @@ public:
 	
 	MemoryBlockList()
 	{
+		initialize();
+	}
+
+	void initialize()
+	{
+		count = 0;
 		lst.listInitializeEmpty();
 	}
 
@@ -235,11 +246,11 @@ struct BlockStats
 	uint64_t sysDeallocSize = 0;
 	uint64_t rdtscSysDeallocSpent = 0;
 
-	uint64_t allocRequestCount;
-	uint64_t allocRequestSize;
+	uint64_t allocRequestCount = 0;
+	uint64_t allocRequestSize = 0;
 
-	uint64_t deallocRequestCount;
-	uint64_t deallocRequestSize;
+	uint64_t deallocRequestCount = 0;
+	uint64_t deallocRequestSize = 0;
 
 	void printStats()
 	{
@@ -350,12 +361,29 @@ public:
 	{
 		stats.printStats();
 	}
+
+	void* AllocateAddressSpace(size_t size)
+	{
+		return VirtualMemory::AllocateAddressSpace( size );
+	}
+	void* CommitMemory(void* addr, size_t size)
+	{
+		return VirtualMemory::CommitMemory( addr, size);
+	}
+	void DecommitMemory(void* addr, size_t size)
+	{
+		VirtualMemory::DecommitMemory( addr, size );
+	}
+	void FreeAddressSpace(void* addr, size_t size)
+	{
+		VirtualMemory::FreeAddressSpace( addr, size );
+	}
 };
 
 
-constexpr size_t max_cached_size = 256; // # of pages
-constexpr size_t single_page_cache_size = 4;
-constexpr size_t multi_page_cache_size = 2;
+constexpr size_t max_cached_size = 32; // # of pages
+constexpr size_t single_page_cache_size = 8;
+constexpr size_t multi_page_cache_size = 4;
 
 struct PageAllocatorWithCaching // to be further developed for practical purposes
 {
@@ -374,6 +402,24 @@ public:
 	void initialize(uint8_t blockSizeExp)
 	{
 		this->blockSizeExp = blockSizeExp;
+		for ( size_t ix=0; ix<=max_cached_size; ++ ix )
+			freeBlocks[ix].initialize();
+	}
+
+	void deinitialize()
+	{
+		for ( size_t ix=0; ix<=max_cached_size; ++ ix )
+		{
+			while ( !freeBlocks[ix].empty() )
+			{
+				MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(freeBlocks[ix].popFront());
+				size_t sz = chk->getSize();
+				uint64_t start = __rdtsc();
+				VirtualMemory::deallocate(chk, sz );
+				uint64_t end = __rdtsc();
+				stats.registerSysDealloc( sz, end - start );
+			}
+		}
 	}
 
 	MemoryBlockListItem* getFreeBlockInt(size_t sz)
@@ -425,6 +471,23 @@ public:
 		return getFreeBlockInt(sz);
 	}
 
+	void* getFreeBlockNoCache(size_t sz)
+	{
+		stats.registerAllocRequest( sz );
+
+		assert(isAlignedExp(sz, blockSizeExp));
+
+		uint64_t start = __rdtsc();
+		void* ptr = VirtualMemory::allocate(sz);
+		uint64_t end = __rdtsc();
+		stats.registerSysAlloc( sz, end - start );
+
+		if (ptr)
+			return ptr;
+
+		throw std::bad_alloc();
+	}
+
 
 	void freeChunk( void* ptr )
 	{
@@ -457,6 +520,115 @@ public:
 		stats.registerSysDealloc( sz, end - start );
 	}
 
+	void freeChunkNoCache( void* block, size_t sz )
+	{
+//		assert(!chk->isFree());
+//		assert(!chk->isInList());
+
+		stats.registerDeallocRequest( sz );
+
+		uint64_t start = __rdtsc();
+		VirtualMemory::deallocate( block, sz );
+		uint64_t end = __rdtsc();
+		stats.registerSysDealloc( sz, end - start );
+	}
+
+	const BlockStats& getStats() const { return stats; }
+
+	void printStats()
+	{
+		stats.printStats();
+	}
+
+	void* AllocateAddressSpace(size_t size)
+	{
+		return VirtualMemory::AllocateAddressSpace( size );
+	}
+	void* CommitMemory(void* addr, size_t size)
+	{
+		stats.registerAllocRequest( size );
+		void* ret = VirtualMemory::CommitMemory( addr, size);
+		if (ret == (void*)(-1))
+		{
+			printf( "Committing failed at %zd (%zx) (0x%zx bytes in total)\n", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
+		}
+		return ret;
+	}
+	void DecommitMemory(void* addr, size_t size)
+	{
+		VirtualMemory::DecommitMemory( addr, size );
+	}
+	void FreeAddressSpace(void* addr, size_t size)
+	{
+		VirtualMemory::FreeAddressSpace( addr, size );
+	}
+};
+
+struct PageAllocatorNoCachingForTestPurposes // to be further developed for practical purposes
+{
+	uint8_t* basePtr = nullptr;
+	uint8_t* currentPtr = nullptr;
+	BlockStats stats;
+	uint8_t blockSizeExp = 0;
+	size_t allocFixedSize;
+
+public:
+
+	void initialize(uint8_t blockSizeExp)
+	{
+		this->blockSizeExp = blockSizeExp;
+		allocFixedSize = (1 << 30);
+		uint64_t start = __rdtsc();
+		basePtr = reinterpret_cast<uint8_t*>( VirtualMemory::allocate(allocFixedSize) );
+		uint64_t end = __rdtsc();
+		stats.registerSysAlloc( allocFixedSize, end - start );
+		currentPtr = basePtr;
+	}
+
+	void deinitialize()
+	{
+		uint64_t start = __rdtsc();
+		VirtualMemory::deallocate( basePtr, allocFixedSize );
+		uint64_t end = __rdtsc();
+		stats.registerSysDealloc( allocFixedSize, end - start );
+		currentPtr = nullptr;
+	}
+
+	MemoryBlockListItem* getFreeBlock(size_t sz)
+	{
+		MemoryBlockListItem* ret = reinterpret_cast<MemoryBlockListItem*>(currentPtr);
+		currentPtr += sz;
+		if ( currentPtr > basePtr + allocFixedSize )
+		{
+			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
+			throw std::bad_alloc();
+		}
+		return ret;
+	}
+
+	void* getFreeBlockNoCache(size_t sz)
+	{
+		MemoryBlockListItem* ret = reinterpret_cast<MemoryBlockListItem*>(currentPtr);
+		currentPtr += sz;
+		if ( currentPtr > basePtr + allocFixedSize )
+		{
+			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
+			throw std::bad_alloc();
+		}
+		return ret;
+	}
+
+
+	void freeChunk( MemoryBlockListItem* chk )
+	{
+//		throw std::bad_alloc();
+	}
+
+	void freeChunkNoCache( void* block, size_t sz )
+	{
+//		throw std::bad_alloc();
+	}
+
 	const BlockStats& getStats() const { return stats; }
 
 	void doHouseKeeping() {}
@@ -464,6 +636,28 @@ public:
 	void printStats()
 	{
 		stats.printStats();
+	}
+
+	void* AllocateAddressSpace(size_t size)
+	{
+		void* ret = currentPtr;
+		currentPtr += size;
+		if ( currentPtr > basePtr + allocFixedSize )
+		{
+			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
+			throw std::bad_alloc();
+		}
+		return ret;
+	}
+	void* CommitMemory(void* addr, size_t size)
+	{
+		return addr;
+	}
+	void DecommitMemory(void* addr, size_t size)
+	{
+	}
+	void FreeAddressSpace(void* addr, size_t size)
+	{
 	}
 };
 

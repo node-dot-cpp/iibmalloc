@@ -51,13 +51,14 @@
 #endif
 
 #include "test_common.h"
-#include "bucket_allocator.h"
+//#include "bucket_allocator.h"
+#include "bucket_allocator_keeping_pages.h"
 
 
 extern thread_local unsigned long long rnd_seed;
 constexpr size_t max_threads = 32;
 
-FORCE_INLINE unsigned long long rng(void)
+FORCE_INLINE unsigned long long rng64(void)
 {
 	unsigned long long c = 7319936632422683443ULL;
 	unsigned long long x = (rnd_seed += c);
@@ -113,7 +114,7 @@ inline void testDistribution()
 
 	for (size_t i=0;i<testCnt;++i)
 	{
-		size_t val = calcSizeWithStatsAdjustment( rng(), exp );
+		size_t val = calcSizeWithStatsAdjustment( rng64(), exp );
 //		assert( val <= (((size_t)1)<<exp) );
 		assert( val );
 		if ( val <=8 )
@@ -134,10 +135,11 @@ inline void testDistribution()
 }
 
 enum { TRY_ALL = 0xFFFFFFFF, USE_EMPTY_TEST = 0x1, USE_PER_THREAD_ALLOCATOR = 0x2, USE_NEW_DELETE = 0x4, };
-enum { USE_RANDOMPOS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_FIXEDSIZE, USE_RANDOMPOS_FULLMEMACCESS_RANDOMSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_RANDOMUNITSIZE, USE_DEALLOCALLOCLEASTRECENTLYUSED_SAMEUNITSIZE, 
-	USE_FREQUENTANDINFREQUENT_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENT_SKEWEDBINSELECTION_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_RANDOMUNITSIZE, USE_FREQUENTANDINFREQUENTWITHACCESS_SKEWEDBINSELECTION_RANDOMUNITSIZE };
+enum { USE_RANDOMPOS_RANDOMSIZE };
+enum MEM_ACCESS_TYPE { none, single, full };
 
-struct ThreadTestRes
+
+struct CommonTestResults
 {
 	size_t threadID;
 
@@ -147,7 +149,10 @@ struct ThreadTestRes
 	uint64_t rdtscSetup;
 	uint64_t rdtscMainLoop;
 	uint64_t rdtscExit;
+};
 
+struct ThreadTestRes : public CommonTestResults
+{
 	size_t sysAllocCallCntAfterSetup;
 	size_t sysDeallocCallCntAfterSetup;
 	size_t sysAllocCallCntAfterMainLoop;
@@ -209,6 +214,9 @@ struct TestRes
 	size_t durEmpty;
 	size_t durNewDel;
 	size_t durPerThreadAlloc;
+	size_t cumulativeDurEmpty;
+	size_t cumulativeDurNewDel;
+	size_t cumulativeDurPerThreadAlloc;
 	ThreadTestRes threadResEmpty[max_threads];
 	ThreadTestRes threadResNewDel[max_threads];
 	ThreadTestRes threadResPerThreadAlloc[max_threads];
@@ -225,6 +233,7 @@ struct TestStartupParams
 	size_t memReadCnt;
 	size_t iterCount;
 	size_t allocatorType;
+	MEM_ACCESS_TYPE mat;
 };
 
 struct TestStartupParamsAndResults
@@ -241,6 +250,318 @@ struct ThreadStartupParamsAndResults
 	ThreadTestRes* threadResNewDel;
 	ThreadTestRes* threadResPerThreadAlloc;
 };
+
+class NewDeleteUnderTest
+{
+	CommonTestResults* testRes;
+	size_t start;
+
+public:
+	NewDeleteUnderTest( CommonTestResults* testRes_ ) { testRes = testRes_; }
+	static constexpr bool isFake() { return false; }
+	void init( size_t threadID )
+	{
+		start = GetMillisecondCount();
+		testRes->threadID = threadID; // just as received
+		testRes->rdtscBegin = __rdtsc();
+	}
+
+	void* allocate( size_t sz ) { return new uint8_t[ sz ]; }
+	void deallocate( void* ptr ) { delete [] reinterpret_cast<uint8_t*>(ptr); }
+
+	void deinit() {}
+
+	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
+	void doWhateverAfterCleanupPhase()
+	{
+		testRes->rdtscExit = __rdtsc();
+		testRes->innerDur = GetMillisecondCount() - start;
+	}
+};
+
+class PerThreadAllocatorUnderTest
+{
+	ThreadTestRes* testRes;
+	size_t start;
+
+public:
+	PerThreadAllocatorUnderTest( ThreadTestRes* testRes_ ) { testRes = testRes_; }
+	static constexpr bool isFake() { return false; }
+
+	void init( size_t threadID )
+	{
+		start = GetMillisecondCount();
+		testRes->rdtscBegin = __rdtsc();
+		g_AllocManager.initialize();
+		g_AllocManager.enable();
+	}
+
+	void* allocate( size_t sz ) { return g_AllocManager.allocate( sz ); }
+	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+	void deinit()
+	{
+		g_AllocManager.deinitialize();
+		g_AllocManager.disable();
+	}
+
+	void doWhateverAfterSetupPhase()
+	{
+		testRes->rdtscSetup = __rdtsc();
+		testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterSetup = g_AllocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterSetup = g_AllocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterSetup = g_AllocManager.getStats().deallocRequestCount;
+	}
+
+	void doWhateverAfterMainLoopPhase()
+	{
+		testRes->rdtscMainLoop = __rdtsc();
+		testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterMainLoop = g_AllocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterMainLoop = g_AllocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterMainLoop = g_AllocManager.getStats().deallocRequestCount;
+	}
+
+	void doWhateverAfterCleanupPhase()
+	{
+		testRes->rdtscExit = __rdtsc();
+		testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterExit = g_AllocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterExit = g_AllocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterExit = g_AllocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterExit = g_AllocManager.getStats().deallocRequestCount;
+		testRes->innerDur = GetMillisecondCount() - start;
+	}
+};
+
+class FakeAllocatorUnderTest
+{
+	CommonTestResults* testRes;
+	size_t start;
+	uint8_t* fakeBuffer = nullptr;
+	static constexpr size_t fakeBufferSize = 0x1000000;
+
+public:
+	FakeAllocatorUnderTest( CommonTestResults* testRes_ ) { testRes = testRes_; }
+	static constexpr bool isFake() { return true; } // thus indicating that certain checks over allocated memory should be ommited
+
+	void init( size_t threadID )
+	{
+		start = GetMillisecondCount();
+		testRes->threadID = threadID; // just as received
+		testRes->rdtscBegin = __rdtsc();
+		fakeBuffer = new uint8_t [fakeBufferSize];
+	}
+
+	void* allocate( size_t sz ) { assert( sz <= fakeBufferSize ); return fakeBuffer; }
+	void deallocate( void* ptr ) {}
+
+	void deinit() { if ( fakeBuffer ) delete [] fakeBuffer; fakeBuffer = nullptr; }
+
+	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
+	void doWhateverAfterCleanupPhase()
+	{
+		testRes->rdtscExit = __rdtsc();
+		testRes->innerDur = GetMillisecondCount() - start;
+	}
+};
+
+constexpr double Pareto_80_20_6[7] = {
+	0.262144000000,
+	0.393216000000,
+	0.245760000000,
+	0.081920000000,
+	0.015360000000,
+	0.001536000000,
+	0.000064000000};
+
+struct Pareto_80_20_6_Data
+{
+	uint32_t probabilityRanges[6];
+	uint32_t offsets[8];
+};
+
+FORCE_INLINE
+void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
+{
+	data.probabilityRanges[0] = (uint32_t)(UINT32_MAX * Pareto_80_20_6[0]);
+	data.probabilityRanges[6] = (uint32_t)(UINT32_MAX * (1. - Pareto_80_20_6[6]));
+	for ( size_t i=1; i<5; ++i )
+		data.probabilityRanges[i] = data.probabilityRanges[i-1] + (uint32_t)(UINT32_MAX * Pareto_80_20_6[i]);
+	data.offsets[0] = 0;
+	data.offsets[7] = itemCount;
+	for ( size_t i=0; i<6; ++i )
+		data.offsets[i+1] = data.offsets[i] + (uint32_t)(itemCount * Pareto_80_20_6[6-i]);
+}
+
+FORCE_INLINE
+size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uint32_t rnum2 )
+{
+	size_t idx = 6;
+	if ( rnum1 < data.probabilityRanges[0] )
+		idx = 0;
+	else if ( rnum1 < data.probabilityRanges[1] )
+		idx = 1;
+	else if ( rnum1 < data.probabilityRanges[2] )
+		idx = 2;
+	else if ( rnum1 < data.probabilityRanges[3] )
+		idx = 3;
+	else if ( rnum1 < data.probabilityRanges[4] )
+		idx = 4;
+	else if ( rnum1 < data.probabilityRanges[5] )
+		idx = 5;
+	uint32_t rangeSize = data.offsets[ idx + 1 ] - data.offsets[ idx ];
+	uint32_t offsetInRange = rnum2 % rangeSize;
+	return data.offsets[ idx ] + offsetInRange;
+}
+
+template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
+void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
+{
+	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
+	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
+//	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+	allocatorUnderTest.init( threadID );
+
+	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
+
+	size_t dummyCtr = 0;
+
+	Pareto_80_20_6_Data paretoData;
+	assert( maxItems <= UINT32_MAX );
+	Pareto_80_20_6_Init( paretoData, (uint32_t)maxItems );
+
+	size_t start = GetMillisecondCount();
+
+	struct TestBin
+	{
+		uint8_t* ptr;
+		size_t sz;
+	};
+
+	TestBin* baseBuff = nullptr; 
+	if ( !allocatorUnderTest.isFake() )
+		baseBuff = reinterpret_cast<TestBin*>( allocatorUnderTest.allocate( maxItems * sizeof(TestBin) ) );
+	else
+		baseBuff = new TestBin [ maxItems ]; // just using standard allocator
+	assert( baseBuff );
+	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
+
+	// setup (saturation)
+	for ( size_t i=0;i<maxItems/32; ++i )
+	{
+		uint32_t randNum = (uint32_t)( rng64() );
+		for ( size_t j=0; j<32; ++j )
+			if ( (randNum >> j) & 1 )
+			{
+				size_t randNumSz = rng64();
+				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
+				baseBuff[i*32+j].sz = sz;
+				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
+				if constexpr ( doMemAccess )
+				{
+					if constexpr ( doFullAccess )
+						memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
+					else
+					{
+						static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+						baseBuff[i*32+j].ptr[sz/2] = (uint8_t)sz;
+					}
+				}
+			}
+	}
+	allocatorUnderTest.doWhateverAfterSetupPhase();
+
+	// main loop
+	for ( size_t j=0;j<iterCount; ++j )
+	{
+		size_t randNum = rng64();
+//		size_t idx = randNum % maxItems;
+		uint32_t rnum1 = (uint32_t)randNum;
+		uint32_t rnum2 = (uint32_t)(randNum >> 32);
+		size_t idx = Pareto_80_20_6_Rand( paretoData, rnum1, rnum2 );
+		if ( baseBuff[idx].ptr )
+		{
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
+			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
+			baseBuff[idx].ptr = 0;
+		}
+		else
+		{
+			size_t sz = calcSizeWithStatsAdjustment( rng64(), maxItemSizeExp );
+			baseBuff[idx].sz = sz;
+			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+					memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					baseBuff[idx].ptr[sz/2] = (uint8_t)sz;
+				}
+			}
+		}
+	}
+	allocatorUnderTest.doWhateverAfterMainLoopPhase();
+
+	// exit
+	for ( size_t idx=0; idx<maxItems; ++idx )
+		if ( baseBuff[idx].ptr )
+		{
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
+			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
+		}
+
+	if ( !allocatorUnderTest.isFake() )
+		allocatorUnderTest.deallocate( baseBuff );
+	else
+		delete [] baseBuff;
+	allocatorUnderTest.deinit();
+	allocatorUnderTest.doWhateverAfterCleanupPhase();
+		
+	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
+}
+
 
 
 

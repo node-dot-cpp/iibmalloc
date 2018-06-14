@@ -422,6 +422,7 @@ size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uin
 	return data.offsets[ idx ] + offsetInRange;
 }
 
+#if 1
 template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
 void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
 {
@@ -429,8 +430,6 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
 //	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
-
-	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
 
 	size_t dummyCtr = 0;
 
@@ -561,7 +560,147 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 		
 	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
 }
+#else
+template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
+void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCount, size_t maxItems, size_t maxItemSizeExp, size_t threadID )
+{
+	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
+	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
+//	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+	allocatorUnderTest.init( threadID );
 
+	size_t dummyCtr = 0;
+
+	Pareto_80_20_6_Data paretoData;
+	assert( maxItems <= UINT32_MAX );
+	Pareto_80_20_6_Init( paretoData, (uint32_t)maxItems );
+
+	size_t start = GetMillisecondCount();
+
+	struct TestBin
+	{
+		uint8_t* ptr;
+		size_t sz;
+	};
+
+	TestBin* baseBuff = nullptr; 
+	if ( !allocatorUnderTest.isFake() )
+		baseBuff = reinterpret_cast<TestBin*>( allocatorUnderTest.allocate( maxItems * sizeof(TestBin) ) );
+	else
+		baseBuff = new TestBin [ maxItems ]; // just using standard allocator
+	assert( baseBuff );
+	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
+
+	// setup (saturation)
+	for ( size_t i=0;i<maxItems/32; ++i )
+	{
+		uint32_t randNum = (uint32_t)( rng64() );
+		for ( size_t j=0; j<32; ++j )
+			if ( (randNum >> j) & 1 )
+			{
+//				size_t randNumSz = rng64();
+//				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
+				size_t sz = 1 << maxItemSizeExp;
+				baseBuff[i*32+j].sz = sz;
+				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
+				if constexpr ( doMemAccess )
+				{
+					if constexpr ( doFullAccess )
+						memset( baseBuff[i*32+j].ptr, (uint8_t)sz, sz );
+					else
+					{
+						static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+						baseBuff[i*32+j].ptr[sz/2] = (uint8_t)sz;
+					}
+				}
+			}
+	}
+	allocatorUnderTest.doWhateverAfterSetupPhase();
+
+	// main loop
+	for ( size_t j=0;j<iterCount; ++j )
+	{
+		size_t randNum = rng64();
+		size_t idx = randNum % maxItems;
+//		uint32_t rnum1 = (uint32_t)randNum;
+//		uint32_t rnum2 = (uint32_t)(randNum >> 32);
+//		size_t idx = Pareto_80_20_6_Rand( paretoData, rnum1, rnum2 );
+		if ( baseBuff[idx].ptr )
+		{
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
+			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
+			baseBuff[idx].ptr = 0;
+		}
+		else
+		{
+//			size_t sz = calcSizeWithStatsAdjustment( rng64(), maxItemSizeExp );
+			size_t sz = 1 << maxItemSizeExp;
+			baseBuff[idx].sz = sz;
+			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+					memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					baseBuff[idx].ptr[sz/2] = (uint8_t)sz;
+				}
+			}
+		}
+	}
+	allocatorUnderTest.doWhateverAfterMainLoopPhase();
+
+	// exit
+	for ( size_t idx=0; idx<maxItems; ++idx )
+		if ( baseBuff[idx].ptr )
+		{
+			if constexpr ( doMemAccess )
+			{
+				if constexpr ( doFullAccess )
+				{
+					size_t i=0;
+					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+						dummyCtr += tail[i];
+				}
+				else
+				{
+					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+				}
+			}
+			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
+		}
+
+	if ( !allocatorUnderTest.isFake() )
+		allocatorUnderTest.deallocate( baseBuff );
+	else
+		delete [] baseBuff;
+	allocatorUnderTest.deinit();
+	allocatorUnderTest.doWhateverAfterCleanupPhase();
+		
+	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
+}
+#endif
 
 
 

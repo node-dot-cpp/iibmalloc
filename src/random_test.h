@@ -58,7 +58,7 @@
 extern thread_local unsigned long long rnd_seed;
 constexpr size_t max_threads = 32;
 
-FORCE_INLINE unsigned long long rng(void)
+FORCE_INLINE unsigned long long rng64(void)
 {
 	unsigned long long c = 7319936632422683443ULL;
 	unsigned long long x = (rnd_seed += c);
@@ -114,7 +114,7 @@ inline void testDistribution()
 
 	for (size_t i=0;i<testCnt;++i)
 	{
-		size_t val = calcSizeWithStatsAdjustment( rng(), exp );
+		size_t val = calcSizeWithStatsAdjustment( rng64(), exp );
 //		assert( val <= (((size_t)1)<<exp) );
 		assert( val );
 		if ( val <=8 )
@@ -391,34 +391,34 @@ struct Pareto_80_20_6_Data
 FORCE_INLINE
 void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 {
-	data.probabilityRanges[0] = UINT32_MAX * Pareto_80_20_6[0];
-	data.probabilityRanges[6] = UINT32_MAX * (1. - Pareto_80_20_6[6]);
+	data.probabilityRanges[0] = (uint32_t)(UINT32_MAX * Pareto_80_20_6[0]);
+	data.probabilityRanges[6] = (uint32_t)(UINT32_MAX * (1. - Pareto_80_20_6[6]));
 	for ( size_t i=1; i<5; ++i )
-		data.probabilityRanges[i] = data.probabilityRanges[i-1] + UINT32_MAX * Pareto_80_20_6[i];
+		data.probabilityRanges[i] = data.probabilityRanges[i-1] + (uint32_t)(UINT32_MAX * Pareto_80_20_6[i]);
 	data.offsets[0] = 0;
-	data.offsets[8] = itemCount;
+	data.offsets[7] = itemCount;
 	for ( size_t i=0; i<6; ++i )
-		data.offsets[i+1] = data.offsets[i] + itemCount * Pareto_80_20_6[6-i];
+		data.offsets[i+1] = data.offsets[i] + (uint32_t)(itemCount * Pareto_80_20_6[6-i]);
 }
 
 FORCE_INLINE
-size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rangeSelectionRand, uint32_t offsetRand )
+size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uint32_t rnum2 )
 {
 	size_t idx = 6;
-	if ( rangeSelectionRand < data.probabilityRanges[0] )
+	if ( rnum1 < data.probabilityRanges[0] )
 		idx = 0;
-	else if ( rangeSelectionRand < data.probabilityRanges[1] )
+	else if ( rnum1 < data.probabilityRanges[1] )
 		idx = 1;
-	else if ( rangeSelectionRand < data.probabilityRanges[2] )
+	else if ( rnum1 < data.probabilityRanges[2] )
 		idx = 2;
-	else if ( rangeSelectionRand < data.probabilityRanges[3] )
+	else if ( rnum1 < data.probabilityRanges[3] )
 		idx = 3;
-	else if ( rangeSelectionRand < data.probabilityRanges[4] )
+	else if ( rnum1 < data.probabilityRanges[4] )
 		idx = 4;
-	else if ( rangeSelectionRand < data.probabilityRanges[5] )
+	else if ( rnum1 < data.probabilityRanges[5] )
 		idx = 5;
 	uint32_t rangeSize = data.offsets[ idx + 1 ] - data.offsets[ idx ];
-	uint32_t offsetInRange = offsetRand % rangeSize;
+	uint32_t offsetInRange = rnum2 % rangeSize;
 	return data.offsets[ idx ] + offsetInRange;
 }
 
@@ -430,11 +430,15 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 //	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
-	size_t start = GetMillisecondCount();
-
 	size_t itemSizeMask = ( ((size_t)1) << maxItemSizeExp) - 1;
 
 	size_t dummyCtr = 0;
+
+	Pareto_80_20_6_Data paretoData;
+	assert( maxItems <= UINT32_MAX );
+	Pareto_80_20_6_Init( paretoData, (uint32_t)maxItems );
+
+	size_t start = GetMillisecondCount();
 
 	struct TestBin
 	{
@@ -453,11 +457,11 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	// setup (saturation)
 	for ( size_t i=0;i<maxItems/32; ++i )
 	{
-		uint32_t randNum = (uint32_t)( rng() );
+		uint32_t randNum = (uint32_t)( rng64() );
 		for ( size_t j=0; j<32; ++j )
 			if ( (randNum >> j) & 1 )
 			{
-				size_t randNumSz = rng();
+				size_t randNumSz = rng64();
 				size_t sz = calcSizeWithStatsAdjustment( randNumSz, maxItemSizeExp );
 				baseBuff[i*32+j].sz = sz;
 				baseBuff[i*32+j].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
@@ -478,8 +482,11 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	// main loop
 	for ( size_t j=0;j<iterCount; ++j )
 	{
-		size_t randNum = rng();
-		size_t idx = randNum % maxItems;
+		size_t randNum = rng64();
+//		size_t idx = randNum % maxItems;
+		uint32_t rnum1 = (uint32_t)randNum;
+		uint32_t rnum2 = (uint32_t)(randNum >> 32);
+		size_t idx = Pareto_80_20_6_Rand( paretoData, rnum1, rnum2 );
 		if ( baseBuff[idx].ptr )
 		{
 			if constexpr ( doMemAccess )
@@ -504,7 +511,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 		}
 		else
 		{
-			size_t sz = calcSizeWithStatsAdjustment( randNum, maxItemSizeExp );
+			size_t sz = calcSizeWithStatsAdjustment( rng64(), maxItemSizeExp );
 			baseBuff[idx].sz = sz;
 			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
 			if constexpr ( doMemAccess )

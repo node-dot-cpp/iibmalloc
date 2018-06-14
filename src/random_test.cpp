@@ -229,7 +229,7 @@ int main()
 //		params.startupParams.allocatorType = USE_NEW_DELETE;
 //		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
 		params.startupParams.calcMod = USE_RANDOMPOS_RANDOMSIZE;
-		params.startupParams.mat = MEM_ACCESS_TYPE::full;
+		params.startupParams.mat = MEM_ACCESS_TYPE::none;
 
 		size_t threadCountMax = 23;
 

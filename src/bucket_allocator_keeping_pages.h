@@ -449,7 +449,7 @@ public:
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 #endif // USE_ITEM_HEADER
 		size_t fullSz = alignUpExp( sz + memStart, PAGE_SIZE_EXP );
-		MemoryBlockListItem* block = pageAllocator.getFreeBlock( fullSz );
+		void* block = pageAllocator.getFreeBlock( fullSz );
 
 #ifdef USE_ITEM_HEADER
 #else

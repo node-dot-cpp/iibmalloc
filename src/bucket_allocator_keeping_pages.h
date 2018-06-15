@@ -306,7 +306,7 @@ class SerializableAllocatorBase
 {
 protected:
 	static constexpr size_t MaxBucketSize = PAGE_SIZE / 16;
-	static constexpr size_t BucketCountExp = 3;
+	static constexpr size_t BucketCountExp = 4;
 	static constexpr size_t BucketCount = 1 << BucketCountExp;
 	void* buckets[BucketCount];
 	static constexpr size_t large_block_idx = 0xFF;
@@ -345,10 +345,17 @@ protected:
 #endif // USE_ITEM_HEADER
 
 protected:
+public:
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSize(uint8_t ix)
+	FORCE_INLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		return 1ULL << (ix + 3);
+	}
+	static constexpr
+	FORCE_INLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
+	{
+		size_t ret = ( 1ULL << ((ix>>1) + 3) ) + ( ( ( ( ix + 1 ) & 1 ) - 1 ) & ( 1ULL << ((ix>>1) + 2) ) );
+		return alignUpExp( ret, 3 ); // this is because of case ix = 1, ret = 12 (keeping 8-byte alignment)
 	}
 
 #if defined(_MSC_VER)
@@ -368,6 +375,19 @@ protected:
 		uint8_t r = _BitScanReverse64(&ix, sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(ix - 2);
 	}
+	static
+	FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+	{
+		if ( sz <= 8 )
+			return 0;
+		sz -= 1;
+		unsigned long ix;
+		uint8_t r = _BitScanReverse64(&ix, sz);
+//		printf( "ix = %zd\n", ix );
+		uint8_t addition = 1 & ( sz >> (ix-1) );
+		ix = ((ix-2)<<1) + addition - 1;
+		return static_cast<uint8_t>(ix);
+	}
 #else
 #error Unknown 32/64 bits architecture
 #endif
@@ -386,6 +406,21 @@ protected:
 	{
 		uint64_t ix = __builtin_clzll(sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
+	}
+	static
+		FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+	{
+		if ( sz <= 8 )
+			return 0;
+		sz -= 1;
+//		uint64_t ix = __builtin_clzll(sz - 1);
+//		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
+		uint64_t ix = __builtin_clzll(sz);
+		ix = 63ull - ix;
+//		printf( "ix = %zd\n", ix );
+		uint8_t addition = 1ull & ( sz >> (ix-1) );
+		ix = ((ix-2)<<1) + addition - 1;
+		return static_cast<uint8_t>(ix);
 	}
 #else
 #error Unknown 32/64 bits architecture
@@ -420,7 +455,8 @@ public:
 		nextPage = h;
 #endif
 		uint8_t* mem = block + memStart;
-		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
+//		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
+		size_t bucketSz = indexToBucketSizeHalfExp( szidx ); // TODO: rework
 		assert( bucketSz >= sizeof( void* ) );
 #ifdef USE_ITEM_HEADER
 		bucketSz += sizeof(ItemHeader);
@@ -470,7 +506,8 @@ public:
 	{
 		if ( sz <= MaxBucketSize )
 		{
-			uint8_t szidx = sizeToIndex( sz );
+//			uint8_t szidx = sizeToIndex( sz );
+			uint8_t szidx = sizeToIndexHalfExp( sz );
 			assert( szidx < BucketCount );
 			if ( buckets[szidx] )
 			{

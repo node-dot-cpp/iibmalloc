@@ -88,8 +88,12 @@ void VirtualMemory::decommit(uintptr_t addr, size_t size)
 void* VirtualMemory::allocate(size_t size)
 {
 	void* ptr = mmap(nullptr, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (!ptr)
+	if (ptr == (void*)(-1))
+	{
+		int e = errno;
+		printf( "mmap error at allocate(%zd), error = %d (%s)\n", size, e, strerror(e) );
 		throw std::bad_alloc();
+	}
 
 	return ptr;
 }
@@ -98,7 +102,13 @@ void VirtualMemory::deallocate(void* ptr, size_t size)
 {
 	assert( size % 4096 == 0 );
 	int ret = munmap(ptr, size);
-	assert( ret == 0 );
+ 	if ( ret == -1 )
+	{
+		int e = errno;
+		printf( "munmap error at deallocate(0x%zx, 0x%zx), error = %d (%s)\n", (size_t)(ptr), size, e, strerror(e) );
+//		printf( "munmap error at deallocate(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
+	}
 }
 
 
@@ -109,7 +119,8 @@ void* VirtualMemory::AllocateAddressSpace(size_t size)
 	if (ptr == (void*)(-1))
 	{
 		int e = errno;
-		printf( "allocation error at AllocateAddressSpace(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		printf( "mmap error at AllocateAddressSpace(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
 	}
  //   msync(ptr, size, MS_SYNC|MS_INVALIDATE);
     return ptr;
@@ -122,7 +133,9 @@ void* VirtualMemory::CommitMemory(void* addr, size_t size)
 	if (ptr == (void*)(-1))
 	{
 		int e = errno;
-		printf( "allocation error at CommitMemory(%zd), error = %d (%s)\n", size, e, strerror(e) );
+//		printf( "allocation error at CommitMemory(0x%zx, 0x%zx), error = %d (%s)\n", (size_t)(addr), size, e, strerror(e) );
+		printf( "mmap error at CommitMemory(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
 	}
 //    msync(addr, size, MS_SYNC|MS_INVALIDATE);
     return ptr;
@@ -134,12 +147,33 @@ void VirtualMemory::DecommitMemory(void* addr, size_t size)
     // the TLB to mark this as a new mapped area which, due to 
     // demand paging, will not be committed until used.
  
-    mmap(addr, size, PROT_NONE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0);
-    msync(addr, size, MS_SYNC|MS_INVALIDATE);
+    void * ptr = mmap(addr, size, PROT_NONE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0);
+ 	if (ptr == (void*)(-1))
+	{
+		int e = errno;
+//		printf( "allocation error at DecommitMemory(0x%zx, 0x%zx), error = %d (%s)\n", (size_t)(addr), size, e, strerror(e) );
+		printf( "mmap error at DecommitMemory(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
+	}
+   msync(addr, size, MS_SYNC|MS_INVALIDATE);
 }
  
 void VirtualMemory::FreeAddressSpace(void* addr, size_t size)
 {
-    msync(addr, size, MS_SYNC);
-    munmap(addr, size);
+    int ret = msync(addr, size, MS_SYNC);
+  	if ( ret == -1 )
+	{
+		int e = errno;
+//		printf( "allocation error at FreeAddressSpace(0x%zx, 0x%zx), error = %d (%s)\n", (size_t)(addr), size, e, strerror(e) );
+		printf( "msync error at FreeAddressSpace(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
+	}
+	ret = munmap(addr, size);
+ 	if ( ret == -1 )
+	{
+		int e = errno;
+//		printf( "allocation error at FreeAddressSpace(0x%zx, 0x%zx), error = %d (%s)\n", (size_t)(addr), size, e, strerror(e) );
+		printf( "munmap error at FreeAddressSpace(%zd), error = %d (%s)\n", size, e, strerror(e) );
+		throw std::bad_alloc();
+	}
 }

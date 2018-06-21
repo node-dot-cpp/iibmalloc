@@ -302,6 +302,104 @@ public:
 #endif
 
 
+template<class BasePageAllocator, size_t commited_block_size, uint16_t max_pages>
+class BulkAllocator : public BasePageAllocator
+{
+	static_assert( ( commited_block_size >> PAGE_SIZE_EXP ) > 0 );
+	static_assert( ( commited_block_size & PAGE_SIZE_MASK ) == 0 );
+	static_assert( max_pages < PAGE_SIZE );
+	constexpr size_t pagesPerAllocatedBlock = commited_block_size >> PAGE_SIZE_EXP;
+	struct AnyChunkHeader
+	{
+	private:
+		uintptr_t prev;
+		uintptr_t next;
+	public:
+		AnyChunkHeader* prevInBlock() {return (AnyChunkHeader*)( prev & ~(uintptr_t)(PAGE_SIZE_MASK) ) ); }
+		AnyChunkHeader* nextInBlock() {return (AnyChunkHeader*)( next & ~(uintptr_t)(PAGE_SIZE_MASK) ) ); }
+		void setPrevInBlock( AnyChunkHeader* prev_ ) { assert( ((uintptr_t)prev_ & PAGE_SIZE_MASK) == 0 ); prev = ( (uintptr_t)prev_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (prev & ((uintptr_t)(PAGE_SIZE_MASK))); }
+//		void setNext( AnyChunkHeader* next_ ) { assert( ((uintptr_t)next_ & PAGE_SIZE_MASK) == 0 ); next = ( (uintptr_t)next_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (next & ((uintptr_t)(PAGE_SIZE_MASK))); }
+//		void setPageCount( uint16_t cnt ) { assert( cnt < max_pages ); prev = ( prev & ~(uintptr_t)(PAGE_SIZE_MASK) ) + cnt; }
+		uint16_t getPageCount() { return prev & ((uintptr_t)(PAGE_SIZE_MASK)); }
+//		void setIsFree( bool isFree ) { next = ( next & ~(uintptr_t)(PAGE_SIZE_MASK) ) + isFree; }
+		bool isFree() { return next & ((uintptr_t)(PAGE_SIZE_MASK)); }
+		void set( AnyChunkHeader* prevInBlock_, AnyChunkHeader* nextInBlock_, uint16_t pageCount, bool isFree )
+		{
+			assert( ((uintptr_t)prevInBlock_ & PAGE_SIZE_MASK) == 0 );
+			assert( ((uintptr_t)nextInBlock_ & PAGE_SIZE_MASK) == 0 );
+			assert( pageCount < max_pages );
+			prev = ((uintptr_t)prevInBlock_) + pageCount;
+			next = ((uintptr_t)nextInBlock_) + isFree;
+		}
+	};
+
+	constexpr size_t maxAllocatableSize() {return ((size_t)max_pages) << PAGE_SIZE_EXP; }
+	struct FreeChunkHeader : public AnyChunkHeader
+	{
+		FreeChunkHeader* prevFree;
+		FreeChunkHeader* nextFree;
+	};
+	FreeChunkHeader* freeListBegin[ max_pages + 1 ];
+
+	AnyChunkHeader* allocate( size_t szIncludingHeader )
+	{
+		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));
+		assert( pageCount <= max_pages );
+		if ( freeListBegin[pageCount - 1] == nullptr )
+		{
+			if ( freeListBegin[ max_pages ] == nullptr )
+			{
+				freeListBegin[ max_pages ] = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
+				freeListBegin[ max_pages ]->set( nullptr, nullptr, pagesPerAllocatedBlock, true );
+				freeListBegin[ max_pages ]->nextFree = nullptr;
+				freeListBegin[ max_pages ]->prevFree = nullptr;
+			}
+
+			assert( freeListBegin[ max_pages ] != nullptr );
+			assert( freeListBegin[ max_pages ]->getSize > max_pages );
+			assert( freeListBegin[ max_pages ]->prevFree == nullptr );
+
+			AnyChunkHeader* ret = freeListBegin[ max_pages ];
+			FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
+			updatedBegin->set( ret, freeListBegin[ max_pages ]->next(), freeListBegin[ max_pages ]->getPageCount() - pageCount, true );
+			updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
+
+			ret->set( ret->prev(), updatedBegin, pageCount, false );
+			assert( freeListBegin[ max_pages ] != updatedBegin );
+
+			uint16_t remainingPageCnt = updatedBegin->getPageCount();
+			if ( remainingPageCnt > max_pages )
+			{
+				freeListBegin[ max_pages ] = updatedBegin;
+				freeListBegin[ max_pages ]->prevFree = nullptr;
+				if ( freeListBegin[ max_pages ]->next() )
+					freeListBegin[ max_pages ]->next()->setPrev( ret );
+			}
+			else
+			{
+				freeListBegin[ max_pages ] = updatedBegin->next;
+				updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
+				freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
+				freeListBegin[ remainingPageCnt - 1 ] = updatedBegin;
+			}
+
+			return ret;
+		}
+		else
+		{
+			assert( freeListBegin[pageCount - 1]->nextFree == nullptr || freeListBegin[pageCount - 1]->nextFree->prevFree == freeListBegin[pageCount - 1] );
+			assert( freeListBegin[pageCount - 1]->prevFree == nullptr );
+			ret = freeListBegin[pageCount - 1];
+			freeListBegin[pageCount - 1] = freeListBegin[pageCount - 1]->nextFree;
+			if ( freeListBegin[pageCount - 1] != nullptr )
+				freeListBegin[pageCount - 1]->prevFree = nullptr;
+
+			return ret;
+		}
+	}
+};
+
+
 class SerializableAllocatorBase
 {
 protected:

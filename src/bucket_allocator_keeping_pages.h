@@ -340,6 +340,27 @@ class BulkAllocator : public BasePageAllocator
 		FreeChunkHeader* nextFree;
 	};
 	FreeChunkHeader* freeListBegin[ max_pages + 1 ];
+	void removeFromFreeList( FreeChunkHeader* item )
+	{
+		if ( item->prevFree )
+		{
+			assert( item->getPageCount() == item->prevFree->getPageCount() );
+			item->prevFree->nextFree = item->nextFree;
+		}
+		else
+		{
+			uint16_t idx = item->getPageCount() - 1;
+			if ( idx > max_pages )
+				idx = max_pages + 1;
+			assert( freeListBegin[idx]->nextFree == item );
+			freeListBegin[idx]->nextFree = item->nextFree;
+		}
+		if ( item->nextFree )
+		{
+			assert( item->getPageCount() == item->nextFree->getPageCount() );
+			item->nextFree->prevFree = item->prevFree;
+		}
+	}
 
 	AnyChunkHeader* allocate( size_t szIncludingHeader )
 	{
@@ -406,9 +427,9 @@ class BulkAllocator : public BasePageAllocator
 			assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
 			assert( prev->nextInBlock() == h );
 			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + prev->prevInBlock()->getPageCount() == reinterpret_cast<uint8_t*>( h ) );
+			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
 			prev->set( prev->prevInBlock(), h->nextInBlock, prev->getPageCount() + h->getPageCount(), true );
 			h = prev;
-			// TODO: edit free list
 		}
 		AnyChunkHeader* next = h->nextInBlock();
 		if ( next && next->isFree )
@@ -416,10 +437,17 @@ class BulkAllocator : public BasePageAllocator
 			assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
 			assert( next->prevInBlock() == h );
 			assert( reinterpret_cast<uint8_t*>(h) + h->getPageCount() == reinterpret_cast<uint8_t*>( next ) );
+			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
 			h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
-			// TODO: edit free list
 		}
-		// TODO: add to respective free list
+
+		FreeChunkHeader* hfree = reinterpret_cast<FreeChunkHeader*>(h);
+		uint16_t idx = hfree->getPageCount() - 1;
+		if ( idx > max_pages )
+			idx = max_pages + 1;
+		hfree->prevFree = nullptr;
+		hfree->nextFree = freeListBegin[idx];
+		freeListBegin[idx] = hfree;
 	}
 };
 

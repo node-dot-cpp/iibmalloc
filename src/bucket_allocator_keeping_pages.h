@@ -308,15 +308,15 @@ class BulkAllocator : public BasePageAllocator
 	static_assert( ( commited_block_size >> PAGE_SIZE_EXP ) > 0 );
 	static_assert( ( commited_block_size & PAGE_SIZE_MASK ) == 0 );
 	static_assert( max_pages < PAGE_SIZE );
-	constexpr size_t pagesPerAllocatedBlock = commited_block_size >> PAGE_SIZE_EXP;
+	static constexpr size_t pagesPerAllocatedBlock = commited_block_size >> PAGE_SIZE_EXP;
 	struct AnyChunkHeader
 	{
 	private:
 		uintptr_t prev;
 		uintptr_t next;
 	public:
-		AnyChunkHeader* prevInBlock() {return (AnyChunkHeader*)( prev & ~(uintptr_t)(PAGE_SIZE_MASK) ) ); }
-		AnyChunkHeader* nextInBlock() {return (AnyChunkHeader*)( next & ~(uintptr_t)(PAGE_SIZE_MASK) ) ); }
+		AnyChunkHeader* prevInBlock() {return (AnyChunkHeader*)( prev & ~((uintptr_t)(PAGE_SIZE_MASK)) ); }
+		AnyChunkHeader* nextInBlock() {return (AnyChunkHeader*)( next & ~((uintptr_t)(PAGE_SIZE_MASK) ) ); }
 		void setPrevInBlock( AnyChunkHeader* prev_ ) { assert( ((uintptr_t)prev_ & PAGE_SIZE_MASK) == 0 ); prev = ( (uintptr_t)prev_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (prev & ((uintptr_t)(PAGE_SIZE_MASK))); }
 //		void setNext( AnyChunkHeader* next_ ) { assert( ((uintptr_t)next_ & PAGE_SIZE_MASK) == 0 ); next = ( (uintptr_t)next_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (next & ((uintptr_t)(PAGE_SIZE_MASK))); }
 //		void setPageCount( uint16_t cnt ) { assert( cnt < max_pages ); prev = ( prev & ~(uintptr_t)(PAGE_SIZE_MASK) ) + cnt; }
@@ -396,6 +396,30 @@ class BulkAllocator : public BasePageAllocator
 
 			return ret;
 		}
+	}
+
+	void deallocate( AnyChunkHeader* h )
+	{
+		AnyChunkHeader* prev = h->prevInBlock();
+		if ( prev && prev->isFree )
+		{
+			assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
+			assert( prev->nextInBlock() == h );
+			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + prev->prevInBlock()->getPageCount() == reinterpret_cast<uint8_t*>( h ) );
+			prev->set( prev->prevInBlock(), h->nextInBlock, prev->getPageCount() + h->getPageCount(), true );
+			h = prev;
+			// TODO: edit free list
+		}
+		AnyChunkHeader* next = h->nextInBlock();
+		if ( next && next->isFree )
+		{
+			assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
+			assert( next->prevInBlock() == h );
+			assert( reinterpret_cast<uint8_t*>(h) + h->getPageCount() == reinterpret_cast<uint8_t*>( next ) );
+			h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
+			// TODO: edit free list
+		}
+		// TODO: add to respective free list
 	}
 };
 

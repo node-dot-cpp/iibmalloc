@@ -468,8 +468,11 @@ protected:
 		size_t idx;
 	};
 	
-#ifdef USE_SOUNDING_PAGE_ADDRESS
 	static constexpr size_t reservation_size_exp = 23;
+	typedef BulkAllocator<PageAllocatorWithCaching, 1 << reservation_size_exp, 32> BulkAllocatorT;
+	BulkAllocatorT bulkAllocator;
+
+#ifdef USE_SOUNDING_PAGE_ADDRESS
 	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 //	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 	PageAllocatorT pageAllocator;

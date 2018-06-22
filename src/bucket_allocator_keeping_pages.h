@@ -365,6 +365,81 @@ class BulkAllocator : public BasePageAllocator
 		}
 	}
 
+	void dbgValidateBlock( const AnyChunkHeader* h )
+	{
+		assert( h != nullptr );
+		size_t szTotal = 0;
+		AnyChunkHeader* curr = h;
+		while ( curr )
+		{
+			szTotal += curr->getPageCount();
+			AnyChunkHeader* next = curr->getNextInBlock();
+			if ( next )
+			{
+				assert( curr->isFree() != next->isFree() );
+				assert( next->getPrevInBlock() == curr );
+				assert( reinterpret_cast<uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( next ) );
+				curr = next;
+			}
+		}
+		curr = h->getPrevInBlock();
+		assert( curr == nullptr || ( curr->isFree() != h->isFree() ) );
+		while ( curr )
+		{
+			szTotal += curr->getPageCount();
+			AnyChunkHeader* prev = curr->getPrevInBlock();
+			if ( prev )
+			{
+				assert( prev->isFree() != curr->isFree() );
+				assert( prev->getNextInBlock() == curr );
+				assert( reinterpret_cast<uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( curr ) );
+				curr = next;
+			}
+		}
+		assert( (szTotal << PAGE_SIZE_EXP) == commited_block_size );
+	}
+
+	void dbgValidateAllBlocks()
+	{
+		for ( size_t i=0; i<blockList.size(); ++i )
+		{
+			AnyChunkHeader* start = reinterpret_cast<AnyChunkHeader*>( blockList[i] );
+			dbgValidateBlock( start );
+		}
+	}
+
+	void dbgValidateFreeList( const FreeChunkHeader* h, const uint16_t pageCnt )
+	{
+		assert( h != nullptr );
+		FreeChunkHeader* curr = h;
+		while ( curr )
+		{
+			assert( curr->getPageCount() == pageCnt || ( pageCnt > max_pages && urr->getPageCount() >= pageCnt ) );
+			assert( curr->isFree() );
+			FreeChunkHeader* next = curr->nextFree;
+			assert( next == nullptr || next->prevFree == curr );
+			curr = next;
+		}
+		curr = h;
+		while ( curr )
+		{
+			assert( curr->getPageCount() == pageCnt || ( pageCnt > max_pages && urr->getPageCount() >= pageCnt ) );
+			assert( curr->isFree() );
+			FreeChunkHeader* prev = curr->prevFree;
+			assert( nexprevt == nullptr || prev->nextFree == curr );
+			curr = next;
+		}
+	}
+
+	void dbgValidateAllFreeLists()
+	{
+		for ( size_t i=0; i<=max_pages; ++i )
+		{
+			FreeChunkHeader* h = freeListBegin[i];
+			dbgValidateFreeList( h, i + 1 );
+		}
+	}
+
 	AnyChunkHeader* allocate( size_t szIncludingHeader )
 	{
 		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));

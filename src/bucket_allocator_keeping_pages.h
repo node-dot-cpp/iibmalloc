@@ -507,7 +507,7 @@ class BulkAllocator : public BasePageAllocator
 		{
 			assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
 			assert( prev->nextInBlock() == h );
-			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + prev->prevInBlock()->getPageCount() == reinterpret_cast<uint8_t*>( h ) );
+			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
 			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
 			prev->set( prev->prevInBlock(), h->nextInBlock, prev->getPageCount() + h->getPageCount(), true );
 			h = prev;

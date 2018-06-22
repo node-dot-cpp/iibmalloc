@@ -38,6 +38,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <vector> // potentially, a temporary solution
 
 #include "bucket_allocator_common.h"
 #include "page_allocator.h"
@@ -332,6 +333,7 @@ class BulkAllocator : public BasePageAllocator
 			next = ((uintptr_t)nextInBlock_) + isFree;
 		}
 	};
+	std::vector<AnyChunkHeader*> blockList;
 
 	constexpr size_t maxAllocatableSize() {return ((size_t)max_pages) << PAGE_SIZE_EXP; }
 	struct FreeChunkHeader : public AnyChunkHeader
@@ -340,6 +342,7 @@ class BulkAllocator : public BasePageAllocator
 		FreeChunkHeader* nextFree;
 	};
 	FreeChunkHeader* freeListBegin[ max_pages + 1 ];
+
 	void removeFromFreeList( FreeChunkHeader* item )
 	{
 		if ( item->prevFree )
@@ -370,7 +373,10 @@ class BulkAllocator : public BasePageAllocator
 		{
 			if ( freeListBegin[ max_pages ] == nullptr )
 			{
-				freeListBegin[ max_pages ] = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
+				FreeChunkHeader* h = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
+				assert( h!= nullptr );
+				blockList.push_back( h );
+				freeListBegin[ max_pages ] = h;
 				freeListBegin[ max_pages ]->set( nullptr, nullptr, pagesPerAllocatedBlock, true );
 				freeListBegin[ max_pages ]->nextFree = nullptr;
 				freeListBegin[ max_pages ]->prevFree = nullptr;

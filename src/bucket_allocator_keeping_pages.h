@@ -310,6 +310,8 @@ class BulkAllocator : public BasePageAllocator
 	static_assert( ( commited_block_size & PAGE_SIZE_MASK ) == 0 );
 	static_assert( max_pages < PAGE_SIZE );
 	static constexpr size_t pagesPerAllocatedBlock = commited_block_size >> PAGE_SIZE_EXP;
+
+public:
 	struct AnyChunkHeader
 	{
 	private:
@@ -333,9 +335,12 @@ class BulkAllocator : public BasePageAllocator
 			next = ((uintptr_t)nextInBlock_) + isFree;
 		}
 	};
-	std::vector<AnyChunkHeader*> blockList;
 
 	constexpr size_t maxAllocatableSize() {return ((size_t)max_pages) << PAGE_SIZE_EXP; }
+
+private:
+	std::vector<AnyChunkHeader*> blockList;
+
 	struct FreeChunkHeader : public AnyChunkHeader
 	{
 		FreeChunkHeader* prevFree;
@@ -440,10 +445,19 @@ class BulkAllocator : public BasePageAllocator
 		}
 	}
 
+public:
 	AnyChunkHeader* allocate( size_t szIncludingHeader )
 	{
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
+
 		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));
 		assert( pageCount <= max_pages );
+
+		AnyChunkHeader* ret = nullptr;
+
 		if ( freeListBegin[pageCount - 1] == nullptr )
 		{
 			if ( freeListBegin[ max_pages ] == nullptr )
@@ -461,7 +475,7 @@ class BulkAllocator : public BasePageAllocator
 			assert( freeListBegin[ max_pages ]->getSize > max_pages );
 			assert( freeListBegin[ max_pages ]->prevFree == nullptr );
 
-			AnyChunkHeader* ret = freeListBegin[ max_pages ];
+			ret = freeListBegin[ max_pages ];
 			FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
 			updatedBegin->set( ret, freeListBegin[ max_pages ]->next(), freeListBegin[ max_pages ]->getPageCount() - pageCount, true );
 			updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
@@ -484,8 +498,6 @@ class BulkAllocator : public BasePageAllocator
 				freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
 				freeListBegin[ remainingPageCnt - 1 ] = updatedBegin;
 			}
-
-			return ret;
 		}
 		else
 		{
@@ -495,13 +507,23 @@ class BulkAllocator : public BasePageAllocator
 			freeListBegin[pageCount - 1] = freeListBegin[pageCount - 1]->nextFree;
 			if ( freeListBegin[pageCount - 1] != nullptr )
 				freeListBegin[pageCount - 1]->prevFree = nullptr;
-
-			return ret;
 		}
+
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
+
+		return ret;
 	}
 
 	void deallocate( AnyChunkHeader* h )
 	{
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
+
 		AnyChunkHeader* prev = h->prevInBlock();
 		if ( prev && prev->isFree )
 		{
@@ -529,6 +551,11 @@ class BulkAllocator : public BasePageAllocator
 		hfree->prevFree = nullptr;
 		hfree->nextFree = freeListBegin[idx];
 		freeListBegin[idx] = hfree;
+
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
 	}
 };
 

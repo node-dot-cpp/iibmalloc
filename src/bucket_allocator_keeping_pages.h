@@ -357,20 +357,22 @@ private:
 	{
 		if ( item->prevFree )
 		{
-			assert( item->getPageCount() == item->prevFree->getPageCount() );
+			assert( item->getPageCount() == item->prevFree->getPageCount() || ( item->getPageCount() > max_pages && item->prevFree->getPageCount() > max_pages ));
 			item->prevFree->nextFree = item->nextFree;
 		}
 		else
 		{
 			uint16_t idx = item->getPageCount() - 1;
-			if ( idx > max_pages )
-				idx = max_pages + 1;
-			assert( freeListBegin[idx]->nextFree == item );
-			freeListBegin[idx]->nextFree = item->nextFree;
+			if ( idx >= max_pages )
+				idx = max_pages;
+			assert( freeListBegin[idx] == item );
+			freeListBegin[idx] = item->nextFree;
+			if ( freeListBegin[idx] != nullptr )
+				freeListBegin[idx]->prevFree = nullptr;
 		}
 		if ( item->nextFree )
 		{
-			assert( item->getPageCount() == item->nextFree->getPageCount() );
+			assert( item->getPageCount() == item->nextFree->getPageCount() || ( item->getPageCount() > max_pages && item->nextFree->getPageCount() > max_pages ));
 			item->nextFree->prevFree = item->prevFree;
 		}
 	}
@@ -501,10 +503,13 @@ public:
 
 				ret = freeListBegin[ max_pages ];
 				freeListBegin[ max_pages ] = freeListBegin[ max_pages ]->nextFree; // pop
+				if ( freeListBegin[ max_pages ] != nullptr )
+					freeListBegin[ max_pages ]->prevFree = nullptr;
 				FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(ret) + (pageCount << PAGE_SIZE_EXP) );
 				updatedBegin->set( ret, ret->nextInBlock(), ret->getPageCount() - (uint16_t)pageCount, true );
 //				updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
 				updatedBegin->prevFree = nullptr;
+				updatedBegin->nextFree = nullptr;
 
 				ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
 				assert( freeListBegin[ max_pages ] != updatedBegin );
@@ -521,9 +526,9 @@ public:
 				}
 				else
 				{
-					freeListBegin[ max_pages ] = updatedBegin->nextFree;
-					if ( freeListBegin[ max_pages ] != nullptr )
-						freeListBegin[ max_pages ]->prevFree = nullptr;
+//					freeListBegin[ max_pages ] = updatedBegin->nextFree;
+//					if ( freeListBegin[ max_pages ] != nullptr )
+//						freeListBegin[ max_pages ]->prevFree = nullptr;
 					updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
 					if ( freeListBegin[ remainingPageCnt - 1 ] != nullptr )
 						freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
@@ -539,11 +544,13 @@ public:
 				if ( freeListBegin[pageCount - 1] != nullptr )
 					freeListBegin[pageCount - 1]->prevFree = nullptr;
 			}
+			assert( ret->getPageCount() <= max_pages );
 		}
 		else
 		{
 			ret = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( pageCount << PAGE_SIZE_EXP ) );
 			ret->set( (FreeChunkHeader*)(void*)(pageCount<<PAGE_SIZE_EXP), nullptr, 0, false );
+			assert( ret->getPageCount() == 0 );
 		}
 
 
@@ -560,6 +567,7 @@ public:
 		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
 		if ( h->getPageCount() != 0 )
 		{
+			assert( h->getPageCount() <= max_pages );
 #ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
@@ -580,17 +588,19 @@ public:
 			{
 				assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
 				assert( next->prevInBlock() == h );
-				assert( reinterpret_cast<uint8_t*>(h) + h->getPageCount() == reinterpret_cast<uint8_t*>( next ) );
+				assert( reinterpret_cast<uint8_t*>(h) + (h->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( next ) );
 				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
 				h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
 			}
 
 			FreeChunkHeader* hfree = reinterpret_cast<FreeChunkHeader*>(h);
 			uint16_t idx = hfree->getPageCount() - 1;
-			if ( idx > max_pages )
-				idx = max_pages + 1;
+			if ( idx >= max_pages )
+				idx = max_pages;
 			hfree->prevFree = nullptr;
 			hfree->nextFree = freeListBegin[idx];
+			if ( freeListBegin[idx] != nullptr )
+				freeListBegin[idx]->prevFree = hfree;
 			freeListBegin[idx] = hfree;
 
 #ifdef BULKALLOCATOR_HEAVY_DEBUG
@@ -600,7 +610,7 @@ public:
 		}
 		else
 		{
-			size_t deallocSize = (size_t)(h->prevInBlock()) << PAGE_SIZE_EXP;
+			size_t deallocSize = (size_t)(h->prevInBlock());
 			this->freeChunkNoCache( ptr, deallocSize );
 		}
 

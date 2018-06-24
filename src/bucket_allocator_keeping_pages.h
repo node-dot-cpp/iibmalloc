@@ -303,6 +303,8 @@ public:
 #endif
 
 
+//#define BULKALLOCATOR_HEAVY_DEBUG
+
 template<class BasePageAllocator, size_t commited_block_size, uint16_t max_pages>
 class BulkAllocator : public BasePageAllocator
 {
@@ -458,7 +460,7 @@ public:
 		for ( size_t i=0; i<=max_pages; ++i )
 			freeListBegin[i] = nullptr;
 		new ( &blockList ) std::vector<AnyChunkHeader*>;
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
@@ -466,7 +468,7 @@ public:
 
 	AnyChunkHeader* allocate( size_t szIncludingHeader )
 	{
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
@@ -545,7 +547,7 @@ public:
 		}
 
 
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
@@ -558,7 +560,7 @@ public:
 		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
 		if ( h->getPageCount() != 0 )
 		{
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
@@ -591,7 +593,7 @@ public:
 			hfree->nextFree = freeListBegin[idx];
 			freeListBegin[idx] = hfree;
 
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
@@ -614,7 +616,7 @@ public:
 		blockList.clear();
 		for ( size_t i=0; i<=max_pages; ++i )
 			freeListBegin[i] = nullptr;
-#if (defined DEBUG) || (defined _DEBUG )
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif

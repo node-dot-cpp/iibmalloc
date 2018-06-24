@@ -332,7 +332,7 @@ public:
 		{
 			assert( ((uintptr_t)prevInBlock_ & PAGE_SIZE_MASK) == 0 );
 			assert( ((uintptr_t)nextInBlock_ & PAGE_SIZE_MASK) == 0 );
-			assert( pageCount < max_pages );
+			assert( pageCount <= (commited_block_size>>PAGE_SIZE_EXP) );
 			prev = ((uintptr_t)prevInBlock_) + pageCount;
 			next = ((uintptr_t)nextInBlock_) + isFree;
 		}
@@ -387,8 +387,8 @@ private:
 				assert( curr->isFree() != next->isFree() );
 				assert( next->prevInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( next ) );
-				curr = next;
 			}
+			curr = next;
 		}
 		curr = h->prevInBlock();
 		assert( curr == nullptr || ( curr->isFree() != h->isFree() ) );
@@ -401,8 +401,8 @@ private:
 				assert( prev->isFree() != curr->isFree() );
 				assert( prev->nextInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( curr ) );
-				curr = prev;
 			}
+			curr = prev;
 		}
 		assert( (szTotal << PAGE_SIZE_EXP) == commited_block_size );
 	}
@@ -456,6 +456,10 @@ public:
 		for ( size_t i=0; i<=max_pages; ++i )
 			freeListBegin[i] = nullptr;
 		new ( &blockList ) std::vector<AnyChunkHeader*>;
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
 	}
 
 	AnyChunkHeader* allocate( size_t szIncludingHeader )
@@ -601,6 +605,10 @@ public:
 		blockList.clear();
 		for ( size_t i=0; i<=max_pages; ++i )
 			freeListBegin[i] = nullptr;
+#if (defined DEBUG) || (defined _DEBUG )
+		dbgValidateAllBlocks();
+		dbgValidateAllFreeLists();
+#endif
 	}
 };
 
@@ -903,6 +911,7 @@ public:
 	{
 		memset( buckets, 0, sizeof( void* ) * BucketCount );
 		pageAllocator.initialize( PAGE_SIZE_EXP );
+		bulkAllocator.initialize( PAGE_SIZE_EXP );
 	}
 
 	void deinitialize()
@@ -918,6 +927,7 @@ public:
 		}
 #endif // USE_SOUNDING_PAGE_ADDRESS
 		pageAllocator.deinitialize();
+		bulkAllocator.deinitialize();
 	}
 
 	~SerializableAllocatorBase()

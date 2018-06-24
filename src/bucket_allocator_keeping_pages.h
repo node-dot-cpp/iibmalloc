@@ -611,7 +611,7 @@ public:
 		for ( size_t i=0; i<blockList.size(); ++i )
 		{
 			assert( blockList[i] != nullptr );
-			freeChunkNoCache( blockList[i], commited_block_size );
+			this->freeChunkNoCache( blockList[i], commited_block_size );
 		}
 		blockList.clear();
 		for ( size_t i=0; i<=max_pages; ++i )

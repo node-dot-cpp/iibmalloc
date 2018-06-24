@@ -465,62 +465,72 @@ public:
 		dbgValidateAllFreeLists();
 #endif
 
-		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));
-		assert( pageCount <= UINT16_MAX );
-		assert( pageCount <= max_pages );
-
 		AnyChunkHeader* ret = nullptr;
 
-		if ( freeListBegin[pageCount - 1] == nullptr )
+		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));
+
+		if ( pageCount <= max_pages )
 		{
-			if ( freeListBegin[ max_pages ] == nullptr )
+			assert( pageCount <= UINT16_MAX );
+			assert( pageCount <= max_pages );
+
+			if ( freeListBegin[pageCount - 1] == nullptr )
 			{
-				FreeChunkHeader* h = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
-				assert( h!= nullptr );
-				blockList.push_back( h );
-				freeListBegin[ max_pages ] = h;
-				freeListBegin[ max_pages ]->set( nullptr, nullptr, pagesPerAllocatedBlock, true );
-				freeListBegin[ max_pages ]->nextFree = nullptr;
-				freeListBegin[ max_pages ]->prevFree = nullptr;
-			}
+				if ( freeListBegin[ max_pages ] == nullptr )
+				{
+					FreeChunkHeader* h = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
+					assert( h!= nullptr );
+					blockList.push_back( h );
+					freeListBegin[ max_pages ] = h;
+					freeListBegin[ max_pages ]->set( nullptr, nullptr, pagesPerAllocatedBlock, true );
+					freeListBegin[ max_pages ]->nextFree = nullptr;
+					freeListBegin[ max_pages ]->prevFree = nullptr;
+				}
 
-			assert( freeListBegin[ max_pages ] != nullptr );
-			assert( freeListBegin[ max_pages ]->getPageCount() > max_pages );
-			assert( freeListBegin[ max_pages ]->prevFree == nullptr );
+				assert( freeListBegin[ max_pages ] != nullptr );
+				assert( freeListBegin[ max_pages ]->getPageCount() > max_pages );
+				assert( freeListBegin[ max_pages ]->prevFree == nullptr );
 
-			ret = freeListBegin[ max_pages ];
-			FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
-			updatedBegin->set( ret, freeListBegin[ max_pages ]->nextInBlock(), freeListBegin[ max_pages ]->getPageCount() - (uint16_t)pageCount, true );
-			updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
+				ret = freeListBegin[ max_pages ];
+				FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
+				updatedBegin->set( ret, freeListBegin[ max_pages ]->nextInBlock(), freeListBegin[ max_pages ]->getPageCount() - (uint16_t)pageCount, true );
+				updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
 
-			ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
-			assert( freeListBegin[ max_pages ] != updatedBegin );
+				ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
+				assert( freeListBegin[ max_pages ] != updatedBegin );
 
-			uint16_t remainingPageCnt = updatedBegin->getPageCount();
-			if ( remainingPageCnt > max_pages )
-			{
-				freeListBegin[ max_pages ] = updatedBegin;
-				freeListBegin[ max_pages ]->prevFree = nullptr;
-				if ( freeListBegin[ max_pages ]->nextInBlock() )
-					freeListBegin[ max_pages ]->nextInBlock()->setPrevInBlock( ret );
+				uint16_t remainingPageCnt = updatedBegin->getPageCount();
+				if ( remainingPageCnt > max_pages )
+				{
+					freeListBegin[ max_pages ] = updatedBegin;
+					freeListBegin[ max_pages ]->prevFree = nullptr;
+					if ( freeListBegin[ max_pages ]->nextInBlock() )
+						freeListBegin[ max_pages ]->nextInBlock()->setPrevInBlock( ret );
+				}
+				else
+				{
+					freeListBegin[ max_pages ] = updatedBegin->nextFree;
+					updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
+					freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
+					freeListBegin[ remainingPageCnt - 1 ] = updatedBegin;
+				}
 			}
 			else
 			{
-				freeListBegin[ max_pages ] = updatedBegin->nextFree;
-				updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
-				freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
-				freeListBegin[ remainingPageCnt - 1 ] = updatedBegin;
+				assert( freeListBegin[pageCount - 1]->nextFree == nullptr || freeListBegin[pageCount - 1]->nextFree->prevFree == freeListBegin[pageCount - 1] );
+				assert( freeListBegin[pageCount - 1]->prevFree == nullptr );
+				ret = freeListBegin[pageCount - 1];
+				freeListBegin[pageCount - 1] = freeListBegin[pageCount - 1]->nextFree;
+				if ( freeListBegin[pageCount - 1] != nullptr )
+					freeListBegin[pageCount - 1]->prevFree = nullptr;
 			}
 		}
 		else
 		{
-			assert( freeListBegin[pageCount - 1]->nextFree == nullptr || freeListBegin[pageCount - 1]->nextFree->prevFree == freeListBegin[pageCount - 1] );
-			assert( freeListBegin[pageCount - 1]->prevFree == nullptr );
-			ret = freeListBegin[pageCount - 1];
-			freeListBegin[pageCount - 1] = freeListBegin[pageCount - 1]->nextFree;
-			if ( freeListBegin[pageCount - 1] != nullptr )
-				freeListBegin[pageCount - 1]->prevFree = nullptr;
+			ret = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( pageCount << PAGE_SIZE_EXP ) );
+			ret->set( (FreeChunkHeader*)(void*)pageCount, nullptr, 0, false );
 		}
+
 
 #if (defined DEBUG) || (defined _DEBUG )
 		dbgValidateAllBlocks();
@@ -533,43 +543,52 @@ public:
 	void deallocate( void* ptr )
 	{
 		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
+		if ( h->getPageCount() != 0 )
+		{
 #if (defined DEBUG) || (defined _DEBUG )
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
 
-		AnyChunkHeader* prev = h->prevInBlock();
-		if ( prev && prev->isFree() )
-		{
-			assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
-			assert( prev->nextInBlock() == h );
-			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
-			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
-			prev->set( prev->prevInBlock(), h->nextInBlock(), prev->getPageCount() + h->getPageCount(), true );
-			h = prev;
-		}
-		AnyChunkHeader* next = h->nextInBlock();
-		if ( next && next->isFree() )
-		{
-			assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
-			assert( next->prevInBlock() == h );
-			assert( reinterpret_cast<uint8_t*>(h) + h->getPageCount() == reinterpret_cast<uint8_t*>( next ) );
-			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
-			h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
-		}
+			AnyChunkHeader* prev = h->prevInBlock();
+			if ( prev && prev->isFree() )
+			{
+				assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
+				assert( prev->nextInBlock() == h );
+				assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
+				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
+				prev->set( prev->prevInBlock(), h->nextInBlock(), prev->getPageCount() + h->getPageCount(), true );
+				h = prev;
+			}
+			AnyChunkHeader* next = h->nextInBlock();
+			if ( next && next->isFree() )
+			{
+				assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
+				assert( next->prevInBlock() == h );
+				assert( reinterpret_cast<uint8_t*>(h) + h->getPageCount() == reinterpret_cast<uint8_t*>( next ) );
+				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
+				h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
+			}
 
-		FreeChunkHeader* hfree = reinterpret_cast<FreeChunkHeader*>(h);
-		uint16_t idx = hfree->getPageCount() - 1;
-		if ( idx > max_pages )
-			idx = max_pages + 1;
-		hfree->prevFree = nullptr;
-		hfree->nextFree = freeListBegin[idx];
-		freeListBegin[idx] = hfree;
+			FreeChunkHeader* hfree = reinterpret_cast<FreeChunkHeader*>(h);
+			uint16_t idx = hfree->getPageCount() - 1;
+			if ( idx > max_pages )
+				idx = max_pages + 1;
+			hfree->prevFree = nullptr;
+			hfree->nextFree = freeListBegin[idx];
+			freeListBegin[idx] = hfree;
 
 #if (defined DEBUG) || (defined _DEBUG )
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
 #endif
+		}
+		else
+		{
+			size_t deallocSize = (size_t)(h->prevInBlock()) << PAGE_SIZE_EXP;
+			this->freeChunkNoCache( ptr, deallocSize );
+		}
+
 	}
 
 	void deinitialize()

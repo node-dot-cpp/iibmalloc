@@ -536,17 +536,17 @@ public:
 #endif
 
 		AnyChunkHeader* prev = h->prevInBlock();
-		if ( prev && prev->isFree )
+		if ( prev && prev->isFree() )
 		{
 			assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
 			assert( prev->nextInBlock() == h );
 			assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
 			removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
-			prev->set( prev->prevInBlock(), h->nextInBlock, prev->getPageCount() + h->getPageCount(), true );
+			prev->set( prev->prevInBlock(), h->nextInBlock(), prev->getPageCount() + h->getPageCount(), true );
 			h = prev;
 		}
 		AnyChunkHeader* next = h->nextInBlock();
-		if ( next && next->isFree )
+		if ( next && next->isFree() )
 		{
 			assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
 			assert( next->prevInBlock() == h );

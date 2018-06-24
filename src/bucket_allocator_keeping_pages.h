@@ -385,7 +385,7 @@ private:
 			if ( next )
 			{
 				assert( next > curr );
-				assert( curr->isFree() != next->isFree() );
+				assert( !(curr->isFree() && next->isFree()) );
 				assert( next->prevInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( next ) );
 			}
@@ -400,7 +400,7 @@ private:
 			if ( prev )
 			{
 				assert( prev < curr );
-				assert( prev->isFree() != curr->isFree() );
+				assert( !(prev->isFree() && curr->isFree()) );
 				assert( prev->nextInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( curr ) );
 			}

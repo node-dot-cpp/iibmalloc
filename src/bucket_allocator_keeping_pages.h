@@ -528,7 +528,7 @@ public:
 		else
 		{
 			ret = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( pageCount << PAGE_SIZE_EXP ) );
-			ret->set( (FreeChunkHeader*)(void*)pageCount, nullptr, 0, false );
+			ret->set( (FreeChunkHeader*)(void*)(pageCount<<PAGE_SIZE_EXP), nullptr, 0, false );
 		}
 
 

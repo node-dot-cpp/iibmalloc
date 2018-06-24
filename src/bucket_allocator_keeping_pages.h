@@ -384,6 +384,7 @@ private:
 			const AnyChunkHeader* next = curr->nextInBlock();
 			if ( next )
 			{
+				assert( next > curr );
 				assert( curr->isFree() != next->isFree() );
 				assert( next->prevInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( next ) );
@@ -398,6 +399,7 @@ private:
 			const AnyChunkHeader* prev = curr->prevInBlock();
 			if ( prev )
 			{
+				assert( prev < curr );
 				assert( prev->isFree() != curr->isFree() );
 				assert( prev->nextInBlock() == curr );
 				assert( reinterpret_cast<const uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( curr ) );
@@ -496,9 +498,11 @@ public:
 				assert( freeListBegin[ max_pages ]->prevFree == nullptr );
 
 				ret = freeListBegin[ max_pages ];
-				FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
-				updatedBegin->set( ret, freeListBegin[ max_pages ]->nextInBlock(), freeListBegin[ max_pages ]->getPageCount() - (uint16_t)pageCount, true );
-				updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
+				freeListBegin[ max_pages ] = freeListBegin[ max_pages ]->nextFree; // pop
+				FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(ret) + (pageCount << PAGE_SIZE_EXP) );
+				updatedBegin->set( ret, ret->nextInBlock(), ret->getPageCount() - (uint16_t)pageCount, true );
+//				updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
+				updatedBegin->prevFree = nullptr;
 
 				ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
 				assert( freeListBegin[ max_pages ] != updatedBegin );
@@ -506,16 +510,21 @@ public:
 				uint16_t remainingPageCnt = updatedBegin->getPageCount();
 				if ( remainingPageCnt > max_pages )
 				{
+					updatedBegin->nextFree = freeListBegin[ max_pages ];
+					if ( freeListBegin[ max_pages ] != nullptr )
+						freeListBegin[ max_pages ]->prevFree = updatedBegin;
 					freeListBegin[ max_pages ] = updatedBegin;
-					freeListBegin[ max_pages ]->prevFree = nullptr;
-					if ( freeListBegin[ max_pages ]->nextInBlock() )
-						freeListBegin[ max_pages ]->nextInBlock()->setPrevInBlock( ret );
+//					if ( freeListBegin[ max_pages ]->nextInBlock() )
+//						freeListBegin[ max_pages ]->nextInBlock()->setPrevInBlock( ret );
 				}
 				else
 				{
 					freeListBegin[ max_pages ] = updatedBegin->nextFree;
+					if ( freeListBegin[ max_pages ] != nullptr )
+						freeListBegin[ max_pages ]->prevFree = nullptr;
 					updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
-					freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
+					if ( freeListBegin[ remainingPageCnt - 1 ] != nullptr )
+						freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;
 					freeListBegin[ remainingPageCnt - 1 ] = updatedBegin;
 				}
 			}

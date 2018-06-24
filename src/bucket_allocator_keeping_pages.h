@@ -441,7 +441,7 @@ private:
 
 	void dbgValidateAllFreeLists()
 	{
-		for ( size_t i=0; i<=max_pages; ++i )
+		for ( uint16_t i=0; i<=max_pages; ++i )
 		{
 			FreeChunkHeader* h = freeListBegin[i];
 			dbgValidateFreeList( h, i + 1 );
@@ -465,6 +465,7 @@ public:
 #endif
 
 		size_t pageCount = ((uintptr_t)(-((intptr_t)((((uintptr_t)(-((intptr_t)szIncludingHeader))))) >> PAGE_SIZE_EXP )));
+		assert( pageCount <= UINT16_MAX );
 		assert( pageCount <= max_pages );
 
 		AnyChunkHeader* ret = nullptr;
@@ -488,10 +489,10 @@ public:
 
 			ret = freeListBegin[ max_pages ];
 			FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(freeListBegin[ max_pages ]) + (pageCount << PAGE_SIZE_EXP) );
-			updatedBegin->set( ret, freeListBegin[ max_pages ]->nextInBlock(), freeListBegin[ max_pages ]->getPageCount() - pageCount, true );
+			updatedBegin->set( ret, freeListBegin[ max_pages ]->nextInBlock(), freeListBegin[ max_pages ]->getPageCount() - (uint16_t)pageCount, true );
 			updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
 
-			ret->set( ret->prevInBlock(), updatedBegin, pageCount, false );
+			ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
 			assert( freeListBegin[ max_pages ] != updatedBegin );
 
 			uint16_t remainingPageCnt = updatedBegin->getPageCount();
@@ -528,8 +529,9 @@ public:
 		return ret;
 	}
 
-	void deallocate( AnyChunkHeader* h )
+	void deallocate( void* ptr )
 	{
+		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
 #if (defined DEBUG) || (defined _DEBUG )
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
@@ -844,12 +846,13 @@ public:
 			else
 			{
 				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
-				MemoryBlockListItem* h = reinterpret_cast<MemoryBlockListItem*>(pageStart);
+/*				MemoryBlockListItem* h = reinterpret_cast<MemoryBlockListItem*>(pageStart);
 				h->size = *reinterpret_cast<size_t*>(pageStart);
 				h->sizeIndex = 0xFFFFFFFF; // TODO: address properly!!!
 				h->prev = nullptr;
 				h->next = nullptr;
-				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(h) );
+				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(h) );*/
+				bulkAllocator.deallocate( pageStart );
 			}
 #else
 			ChunkHeader* h = getChunkFromUsrPtr( ptr );

@@ -444,7 +444,8 @@ private:
 		for ( uint16_t i=0; i<=max_pages; ++i )
 		{
 			FreeChunkHeader* h = freeListBegin[i];
-			dbgValidateFreeList( h, i + 1 );
+			if ( h !=nullptr )
+				dbgValidateFreeList( h, i + 1 );
 		}
 	}
 

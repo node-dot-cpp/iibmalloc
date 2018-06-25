@@ -208,7 +208,6 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 	params.startupParams.allocatorType = allocatorType; // restore
 }
 
-
 int main()
 {
 	TestRes testRes[max_threads];
@@ -219,7 +218,7 @@ int main()
 
 		TestStartupParamsAndResults params;
 		params.startupParams.iterCount = 100000000;
-		params.startupParams.maxItemSize = 8;
+		params.startupParams.maxItemSize = 16;
 //		params.startupParams.maxItems = 23 << 20;
 		params.startupParams.maxItemSize2 = 16;
 		params.startupParams.maxItems2 = 16;
@@ -229,13 +228,13 @@ int main()
 //		params.startupParams.allocatorType = USE_NEW_DELETE;
 //		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
 		params.startupParams.calcMod = USE_RANDOMPOS_RANDOMSIZE;
-		params.startupParams.mat = MEM_ACCESS_TYPE::none;
+		params.startupParams.mat = MEM_ACCESS_TYPE::full;
 
 		size_t threadCountMax = 23;
 
 		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{
-			params.startupParams.maxItems = (1 << 24) / params.startupParams.threadCount;
+			params.startupParams.maxItems = (1 << 25) / params.startupParams.threadCount;
 			params.testRes = testRes + params.startupParams.threadCount;
 			runComparisonTest( params );
 		}

@@ -84,16 +84,13 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		MemoryBlockListItem block;
 		MemoryBlockHeader* next;
 	};
-//	MemoryBlockHeader* memoryBlockHead = nullptr;
 	
 	struct PageBlockDescriptor
 	{
 		PageBlockDescriptor* next = nullptr;
 		void* blockAddress = nullptr;
-//		size_t usageMask = 0;
 		uint16_t nextToUse[ bucket_cnt ];
 		uint16_t nextToCommit[ bucket_cnt ];
-//		static_assert( sizeof( size_t ) * 8 >= bucket_cnt, "revise implementation" );
 		static_assert( UINT16_MAX > pages_per_bucket , "revise implementation" );
 	};
 	PageBlockDescriptor pageBlockListStart;
@@ -134,7 +131,6 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 	void resetLists()
 	{
 		pageBlockListStart.blockAddress = nullptr;
-//		pageBlockListStart.usageMask = 0;
 		for ( size_t i=0; i<bucket_cnt; ++i )
 			pageBlockListStart.nextToUse[i] = pages_per_bucket; // thus triggering switching to a next block whatever bucket is selected
 		for ( size_t i=0; i<bucket_cnt; ++i )
@@ -150,11 +146,8 @@ public:
 	static constexpr size_t reserverdSizeAtPageStart() { return sizeof( MemoryBlockHeader ); }
 
 public:
-//	SoundingAddressPageAllocator( BasePageAllocator& pageAllocator_ ) : pageAllocator( pageAllocator_ ) {}
 	SoundingAddressPageAllocator() {}
 
-//	static FORCE_INLINE size_t addressToIdx( void* ptr ) { return ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) & ( bucket_cnt - 1 ); }
-//	static FORCE_INLINE size_t addressToIdx( void* ptr ) { return ( (uintptr_t)(ptr) >> (reservation_size_exp - bucket_cnt_exp) ) & ( bucket_cnt - 1 ); }
 	static FORCE_INLINE size_t addressToIdx( void* ptr ) 
 	{ 
 		// TODO: make sure computations are optimal
@@ -163,14 +156,6 @@ public:
 		uintptr_t meaningfulBits = padr & meaningfulBitsMask;
 		return meaningfulBits >> pages_per_bucket_exp;
 	}
-/*	static FORCE_INLINE void* idxToPageAddr( void* blockptr, size_t idx ) 
-	{ 
-		assert( idx < bucket_cnt );
-		uintptr_t startAsIdx = addressToIdx( blockptr );
-		void* ret = (void*)( ( ( ( (uintptr_t)(blockptr) >> ( PAGE_SIZE_EXP + bucket_cnt_exp ) ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << PAGE_SIZE_EXP );
-		assert( addressToIdx( ret ) == idx );
-		return ret;
-	}*/
 	static FORCE_INLINE void* idxToPageAddr( void* blockptr, size_t idx, size_t pagesUsed ) 
 	{ 
 		assert( idx < bucket_cnt );
@@ -179,19 +164,12 @@ public:
 		uintptr_t startingPage =  (uintptr_t)(blockptr) >> PAGE_SIZE_EXP;
 		uintptr_t basePage =  ( startingPage >> (reservation_size_exp - PAGE_SIZE_EXP) ) << (reservation_size_exp - PAGE_SIZE_EXP);
 		uintptr_t baseOffset = startingPage - basePage;
-//		uintptr_t stepOffset = baseOffset & (pages_per_bucket - 1);
-//		bool below = pagesUsed < stepOffset;
 		bool below = (idx << pages_per_bucket_exp) + pagesUsed < baseOffset;
 		uintptr_t ret = basePage + (idx << pages_per_bucket_exp) + pagesUsed + (below << (pages_per_bucket_exp + bucket_cnt_exp));
 		ret <<= PAGE_SIZE_EXP;
 		assert( addressToIdx( (void*)( ret ) ) == idx );
 		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
 		return (void*)( ret );
-
-/*		void* ret = (void*)( ( ( ( ( (uintptr_t)(blockptr) >> reservation_size_exp ) << bucket_cnt_exp ) + idx + (( idx < startAsIdx ) << bucket_cnt_exp) ) << ( reservation_size_exp - bucket_cnt_exp ) ) + ( pagesUsed << PAGE_SIZE_EXP ) );
-		assert( addressToIdx( ret ) == idx );
-		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
-		return ret;*/
 	}
 	static FORCE_INLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
 	static FORCE_INLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
@@ -325,10 +303,7 @@ public:
 		AnyChunkHeader* nextInBlock() {return (AnyChunkHeader*)( next & ~((uintptr_t)(PAGE_SIZE_MASK) ) ); }
 		const AnyChunkHeader* nextInBlock() const {return (const AnyChunkHeader*)( next & ~((uintptr_t)(PAGE_SIZE_MASK) ) ); }
 		void setPrevInBlock( AnyChunkHeader* prev_ ) { assert( ((uintptr_t)prev_ & PAGE_SIZE_MASK) == 0 ); prev = ( (uintptr_t)prev_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (prev & ((uintptr_t)(PAGE_SIZE_MASK))); }
-//		void setNext( AnyChunkHeader* next_ ) { assert( ((uintptr_t)next_ & PAGE_SIZE_MASK) == 0 ); next = ( (uintptr_t)next_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (next & ((uintptr_t)(PAGE_SIZE_MASK))); }
-//		void setPageCount( uint16_t cnt ) { assert( cnt < max_pages ); prev = ( prev & ~(uintptr_t)(PAGE_SIZE_MASK) ) + cnt; }
 		uint16_t getPageCount() const { return prev & ((uintptr_t)(PAGE_SIZE_MASK)); }
-//		void setIsFree( bool isFree ) { next = ( next & ~(uintptr_t)(PAGE_SIZE_MASK) ) + isFree; }
 		bool isFree() const { return next & ((uintptr_t)(PAGE_SIZE_MASK)); }
 		void set( AnyChunkHeader* prevInBlock_, AnyChunkHeader* nextInBlock_, uint16_t pageCount, bool isFree )
 		{
@@ -507,7 +482,6 @@ public:
 					freeListBegin[ max_pages ]->prevFree = nullptr;
 				FreeChunkHeader* updatedBegin = reinterpret_cast<FreeChunkHeader*>( reinterpret_cast<uint8_t*>(ret) + (pageCount << PAGE_SIZE_EXP) );
 				updatedBegin->set( ret, ret->nextInBlock(), ret->getPageCount() - (uint16_t)pageCount, true );
-//				updatedBegin->nextFree = freeListBegin[ max_pages ]->nextFree;
 				updatedBegin->prevFree = nullptr;
 				updatedBegin->nextFree = nullptr;
 
@@ -521,14 +495,9 @@ public:
 					if ( freeListBegin[ max_pages ] != nullptr )
 						freeListBegin[ max_pages ]->prevFree = updatedBegin;
 					freeListBegin[ max_pages ] = updatedBegin;
-//					if ( freeListBegin[ max_pages ]->nextInBlock() )
-//						freeListBegin[ max_pages ]->nextInBlock()->setPrevInBlock( ret );
 				}
 				else
 				{
-//					freeListBegin[ max_pages ] = updatedBegin->nextFree;
-//					if ( freeListBegin[ max_pages ] != nullptr )
-//						freeListBegin[ max_pages ]->prevFree = nullptr;
 					updatedBegin->nextFree = freeListBegin[ remainingPageCnt - 1 ];
 					if ( freeListBegin[ remainingPageCnt - 1 ] != nullptr )
 						freeListBegin[ remainingPageCnt - 1 ]->prevFree = updatedBegin;

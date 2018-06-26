@@ -745,23 +745,78 @@ public:
 	void disable() {}
 
 
+	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
+	{
+		constexpr size_t memForbidden = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+		if ( block == nullptr )
+			return false;
+		assert( ( ((uintptr_t)block) & PAGE_SIZE_MASK ) == 0 );
+		assert( ( blockSz & PAGE_SIZE_MASK ) == 0 );
+		if( ( bucketSz & (memForbidden*2-1) ) == 0 ) // that is, (K * bucketSz) % PAGE_SIZE != memForbidden for any K
+		{
+			size_t itemCnt = blockSz / bucketSz;
+			if ( itemCnt )
+			{
+				for ( size_t i=0; i<(itemCnt-1)*bucketSz; i+=bucketSz )
+				{
+					assert( ((i + bucketSz) & PAGE_SIZE_MASK) != memForbidden );
+					*reinterpret_cast<void**>(block + i) = block + i + bucketSz;
+				}
+				*reinterpret_cast<void**>(block + (itemCnt-1)*bucketSz) = nullptr;
+				buckets[bucketidx] = block;
+				return true;
+			}
+			else
+				return false;
+		}
+		else
+		{
+			size_t itemCnt = blockSz / bucketSz;
+			if ( itemCnt )
+			{
+				for ( size_t i=0; i<(itemCnt-1)*bucketSz; i+=bucketSz )
+				{
+					if ( ((i + bucketSz) & PAGE_SIZE_MASK) != memForbidden )
+						*reinterpret_cast<void**>(block + i) = block + i + bucketSz;
+					else
+					{ 
+						assert( i != itemCnt - 2 ); // for small buckets such a bucket could not happen at the end anyway
+						*reinterpret_cast<void**>(block + i) = block + i + bucketSz + bucketSz;
+						i += bucketSz;
+					}
+				}
+				*reinterpret_cast<void**>(block + (itemCnt-1)*bucketSz) = nullptr;
+				buckets[bucketidx] = block;
+				return true;
+			}
+			else
+				return false;
+		}
+	}
+
 	NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
 	{
 #ifdef USE_SOUNDING_PAGE_ADDRESS
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
-		constexpr size_t memStart = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
 #else
+		constexpr size_t memStart = 0;
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( PAGE_SIZE ) );
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 		ChunkHeader* h = reinterpret_cast<ChunkHeader*>( block );
 		h->idx = szidx;
 		h->next = nextPage;
 		nextPage = h;
-#endif
 		uint8_t* mem = block + memStart;
+#endif
 //		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
 		size_t bucketSz = indexToBucketSizeHalfExp( szidx ); // TODO: rework
 		assert( bucketSz >= sizeof( void* ) );
+#ifdef USE_SOUNDING_PAGE_ADDRESS
+		formatAllocatedPageAlignedBlock( block, PAGE_SIZE, bucketSz, szidx );
+		void* ret = buckets[szidx];
+		buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
+		return ret;
+#else
 #ifdef USE_ITEM_HEADER
 		bucketSz += sizeof(ItemHeader);
 #endif // USE_ITEM_HEADER
@@ -777,6 +832,7 @@ public:
 #else
 		return mem;
 #endif // USE_ITEM_HEADER
+#endif
 	}
 
 	NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
@@ -855,7 +911,9 @@ public:
 			}
 #elif defined USE_SOUNDING_PAGE_ADDRESS
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
-			if ( offsetInPage > alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
+//			if ( offsetInPage != alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
+			constexpr size_t memForbidden = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+			if ( offsetInPage != memForbidden )
 			{
 				size_t idx = PageAllocatorT::addressToIdx( ptr );
 				*reinterpret_cast<void**>( ptr ) = buckets[idx];

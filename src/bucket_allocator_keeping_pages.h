@@ -65,12 +65,14 @@ static_assert( 1 + PAGE_SIZE_MASK == PAGE_SIZE, "" );
 #define USE_SOUNDING_PAGE_ADDRESS
 
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp, size_t commit_page_cnt_exp>
+template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp, size_t commit_page_cnt_exp, size_t multipage_page_cnt_exp>
 class SoundingAddressPageAllocator : public BasePageAllocator
 {
 	static constexpr size_t reservation_size = (1 << reservation_size_exp);
 	static constexpr size_t bucket_cnt = (1 << bucket_cnt_exp);
 	static_assert( reservation_size_exp >= bucket_cnt_exp + PAGE_SIZE_EXP, "revise implementation" );
+	static_assert( commit_page_cnt_exp >= multipage_page_cnt_exp );
+	static constexpr size_t multipage_page_cnt = 1 << multipage_page_cnt_exp;
 	static constexpr size_t pages_per_bucket_exp = reservation_size_exp - bucket_cnt_exp - PAGE_SIZE_EXP;
 	static constexpr size_t pages_in_single_commit_exp = (pages_per_bucket_exp >= 1 ? pages_per_bucket_exp - 1 : 0);
 	static constexpr size_t pages_in_single_commit = (1 << pages_in_single_commit_exp);
@@ -143,7 +145,15 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 	}
 
 public:
-	static constexpr size_t reserverdSizeAtPageStart() { return sizeof( MemoryBlockHeader ); }
+//	static constexpr size_t reservedSizeAtPageStart() { return sizeof( MemoryBlockHeader ); }
+
+	struct MultipageData
+	{
+		void* ptr1;
+		size_t sz1;
+		void* ptr2;
+		size_t sz2;
+	};
 
 public:
 	SoundingAddressPageAllocator() {}
@@ -255,6 +265,50 @@ public:
 		}
 	}
 
+	void* getMultipage( size_t idx, MultipageData& mpData )
+	{
+		// NOTE: current implementation just sits over repeated calls to getPage()
+		//       it is reasonably assumed that returned pages are within at most two connected segments
+		// TODO: it's possible to make it more optimal just by writing fram scratches by analogy with getPage() and calls from it
+		mpData.ptr1 = getPage( idx );
+		if constexpr ( multipage_page_cnt == 1 )
+		{
+			asserrt( mpData.ptr1 );
+			mpData.sz1 = PAGE_SIZE;
+			mpData.ptr2 = nullptr;
+			mpData.sz2 = 0;
+			return;
+		}
+		void* nextPage;
+		size_t i=1;
+		for ( ; i<multipage_page_cnt; ++i )
+		{
+			nextPage = getPage( idx );
+			asserrt( nextPage );
+			if ( reinterpret_cast<uint8_t*>(mpData.ptr1) + mpData.sz1 == reinterpret_cast<uint8_t*>(nextPage) )
+				mpData.sz1 += PAGE_SIZE;
+			else break;
+		}
+		if ( i == multipage_page_cnt )
+		{
+			mpData.ptr2 = nullptr;
+			mpData.sz2 = 0;
+			return;
+		}
+		mpData.ptr2 = nextPage;
+		mpData.sz2 = PAGE_SIZE;
+		++i;
+		for ( ; i<multipage_page_cnt; ++i )
+		{
+			nextPage = getPage( idx );
+			asserrt( nextPage );
+			if ( reinterpret_cast<uint8_t*>(mpData.ptr2) + mpData.sz2 == reinterpret_cast<uint8_t*>(nextPage) )
+				mpData.sz2 += PAGE_SIZE;
+			else break;
+		}
+		assert( i == multipage_page_cnt );
+	}
+
 	void freePage( MemoryBlockListItem* chk )
 	{
 		assert( false );
@@ -316,7 +370,7 @@ public:
 	};
 
 	constexpr size_t maxAllocatableSize() {return ((size_t)max_pages) << PAGE_SIZE_EXP; }
-	static constexpr size_t reserverdSizeAtPageStart() { return sizeof( AnyChunkHeader ); }
+	static constexpr size_t reservedSizeAtPageStart() { return sizeof( AnyChunkHeader ); }
 
 private:
 	std::vector<AnyChunkHeader*> blockList;
@@ -624,7 +678,7 @@ protected:
 	BulkAllocatorT bulkAllocator;
 
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
+	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4, 3> PageAllocatorT;
 //	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 	PageAllocatorT pageAllocator;
 #else
@@ -747,7 +801,7 @@ public:
 
 	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
 	{
-		constexpr size_t memForbidden = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+		constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 		if ( block == nullptr )
 			return false;
 		assert( ( ((uintptr_t)block) & PAGE_SIZE_MASK ) == 0 );
@@ -841,7 +895,7 @@ public:
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ) + sizeof( ItemHeader ), ALIGNMENT_EXP );
 #elif defined USE_SOUNDING_PAGE_ADDRESS
 //		constexpr size_t memStart = alignUpExp( sizeof( size_t ), ALIGNMENT_EXP );
-		constexpr size_t memStart = alignUpExp( BulkAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+		constexpr size_t memStart = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 #else
 		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
 #endif // USE_ITEM_HEADER
@@ -912,7 +966,7 @@ public:
 #elif defined USE_SOUNDING_PAGE_ADDRESS
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
 //			if ( offsetInPage != alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
-			constexpr size_t memForbidden = alignUpExp( PageAllocatorT::reserverdSizeAtPageStart(), ALIGNMENT_EXP );
+			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 			if ( offsetInPage != memForbidden )
 			{
 				size_t idx = PageAllocatorT::addressToIdx( ptr );

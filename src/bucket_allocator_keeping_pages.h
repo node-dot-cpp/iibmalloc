@@ -265,7 +265,7 @@ public:
 		}
 	}
 
-	void* getMultipage( size_t idx, MultipageData& mpData )
+	void getMultipage( size_t idx, MultipageData& mpData )
 	{
 		// NOTE: current implementation just sits over repeated calls to getPage()
 		//       it is reasonably assumed that returned pages are within at most two connected segments
@@ -277,6 +277,7 @@ public:
 			mpData.sz1 = PAGE_SIZE;
 			mpData.ptr2 = nullptr;
 			mpData.sz2 = 0;
+			assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 			return;
 		}
 		void* nextPage;
@@ -284,7 +285,7 @@ public:
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
-			asserrt( nextPage );
+			assert( nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr1) + mpData.sz1 == reinterpret_cast<uint8_t*>(nextPage) )
 				mpData.sz1 += PAGE_SIZE;
 			else break;
@@ -293,6 +294,7 @@ public:
 		{
 			mpData.ptr2 = nullptr;
 			mpData.sz2 = 0;
+			assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 			return;
 		}
 		mpData.ptr2 = nextPage;
@@ -301,12 +303,13 @@ public:
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
-			asserrt( nextPage );
+			assert( nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr2) + mpData.sz2 == reinterpret_cast<uint8_t*>(nextPage) )
 				mpData.sz2 += PAGE_SIZE;
 			else break;
 		}
 		assert( i == multipage_page_cnt );
+		assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 	}
 
 	void freePage( MemoryBlockListItem* chk )
@@ -850,8 +853,21 @@ public:
 
 	NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
 	{
+//		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
+		size_t bucketSz = indexToBucketSizeHalfExp( szidx ); // TODO: rework
+		assert( bucketSz >= sizeof( void* ) );
 #ifdef USE_SOUNDING_PAGE_ADDRESS
-		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
+#else
+#endif
+#ifdef USE_SOUNDING_PAGE_ADDRESS
+		PageAllocatorT::MultipageData mpData;
+//		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
+		pageAllocator.getMultipage( szidx, mpData );
+		formatAllocatedPageAlignedBlock( reinterpret_cast<uint8_t*>( mpData.ptr1 ), mpData.sz1, bucketSz, szidx );
+		formatAllocatedPageAlignedBlock( reinterpret_cast<uint8_t*>( mpData.ptr2 ), mpData.sz2, bucketSz, szidx );
+		void* ret = buckets[szidx];
+		buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
+		return ret;
 #else
 		constexpr size_t memStart = 0;
 		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( PAGE_SIZE ) );
@@ -861,16 +877,6 @@ public:
 		h->next = nextPage;
 		nextPage = h;
 		uint8_t* mem = block + memStart;
-#endif
-//		size_t bucketSz = indexToBucketSize( szidx ); // TODO: rework
-		size_t bucketSz = indexToBucketSizeHalfExp( szidx ); // TODO: rework
-		assert( bucketSz >= sizeof( void* ) );
-#ifdef USE_SOUNDING_PAGE_ADDRESS
-		formatAllocatedPageAlignedBlock( block, PAGE_SIZE, bucketSz, szidx );
-		void* ret = buckets[szidx];
-		buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
-		return ret;
-#else
 #ifdef USE_ITEM_HEADER
 		bucketSz += sizeof(ItemHeader);
 #endif // USE_ITEM_HEADER

@@ -280,8 +280,10 @@ public:
 			assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 			return;
 		}
+
 		void* nextPage;
 		size_t i=1;
+		mpData.sz1 = PAGE_SIZE;
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
@@ -663,11 +665,10 @@ public:
 class SerializableAllocatorBase
 {
 protected:
-	static constexpr size_t MaxBucketSize = PAGE_SIZE / 16;
-	static constexpr size_t BucketCountExp = 4;
+	static constexpr size_t MaxBucketSize = PAGE_SIZE * 2;
+	static constexpr size_t BucketCountExp = 5;
 	static constexpr size_t BucketCount = 1 << BucketCountExp;
 	void* buckets[BucketCount];
-	static constexpr size_t large_block_idx = 0xFF;
 
 	struct ChunkHeader
 	{
@@ -697,6 +698,7 @@ protected:
 #endif
 
 #ifdef USE_ITEM_HEADER
+	static constexpr size_t large_block_idx = 0xFF;
 	struct ItemHeader
 	{
 		uint8_t idx;

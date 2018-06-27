@@ -223,10 +223,10 @@ int main()
 		params.startupParams.maxItemSize2 = 16;
 		params.startupParams.maxItems2 = 16;
 		params.startupParams.memReadCnt = 0;
-//		params.startupParams.allocatorType = TRY_ALL;
+		params.startupParams.allocatorType = TRY_ALL;
 //		params.startupParams.allocatorType = USE_EMPTY_TEST;
 //		params.startupParams.allocatorType = USE_NEW_DELETE;
-		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
+//		params.startupParams.allocatorType = USE_PER_THREAD_ALLOCATOR;
 		params.startupParams.calcMod = USE_RANDOMPOS_RANDOMSIZE;
 		params.startupParams.mat = MEM_ACCESS_TYPE::full;
 

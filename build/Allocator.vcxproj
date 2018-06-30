@@ -20,8 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\bucket_allocator.h" />
-    <ClInclude Include="..\src\bucket_allocator_common.h" />
-    <ClInclude Include="..\src\bucket_allocator_keeping_pages.h" />
+    <ClInclude Include="..\src\iibmalloc_common.h" />
+    <ClInclude Include="..\src\iibmalloc.h" />
     <ClInclude Include="..\src\page_allocator.h" />
     <ClInclude Include="..\src\page_allocator_with_map.h" />
     <ClInclude Include="..\src\random_test.h" />

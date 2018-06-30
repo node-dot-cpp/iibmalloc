@@ -26,10 +26,13 @@
     <ClInclude Include="..\src\page_allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\bucket_allocator_common.h">
+    <ClInclude Include="..\src\page_allocator_with_map.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\page_allocator_with_map.h">
+    <ClInclude Include="..\src\iibmalloc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\iibmalloc_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

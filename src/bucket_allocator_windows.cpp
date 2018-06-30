@@ -25,15 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * -------------------------------------------------------------------------------
  * 
- * Per-thread bucket allocator
+ * iibmalloc allocator
  * 
  * v.1.00    May-09-2018    Initial release
  * 
  * -------------------------------------------------------------------------------*/
 
 
-//#include "bucket_allocator.h"
-#include "bucket_allocator_keeping_pages.h"
+#include "iibmalloc.h"
 
 #include <cstdlib>
 #include <cstddef>

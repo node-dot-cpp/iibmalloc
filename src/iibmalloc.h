@@ -25,23 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * -------------------------------------------------------------------------------
  * 
- * Per-thread bucket allocator
+ * iibmalloc allocator
  * 
  * v.1.00    May-09-2018    Initial release
  * 
  * -------------------------------------------------------------------------------*/
 
  
-#ifndef SERIALIZABLE_ALLOCATOR_KEEPING_PAGES_H
-#define SERIALIZABLE_ALLOCATOR_KEEPING_PAGES_H
+#ifndef IIBMALLOC_H
+#define IIBMALLOC_H
 
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <vector> // potentially, a temporary solution
 
-#include "bucket_allocator_common.h"
-#include "page_allocator.h"
+#include "iibmalloc_common.h"
+#include "iibmalloc_page_allocator.h"
 
 
 class SerializableAllocatorBase;
@@ -1186,4 +1186,4 @@ public:
 	}
 };
 
-#endif //SERIALIZABLE_ALLOCATOR_KEEPING_PAGES_H
+#endif // IIBMALLOC_H

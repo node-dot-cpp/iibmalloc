@@ -39,7 +39,7 @@
 #ifndef PAGE_ALLOCATOR_H
 #define PAGE_ALLOCATOR_H
 
-#include "bucket_allocator_common.h"
+#include "iibmalloc_common.h"
 
 #define GET_PERF_DATA
 

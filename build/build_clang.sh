@@ -1,1 +1,1 @@
-clang++ ../src/test_common.cpp ../src/random_test.cpp ../src/page_allocator_linux.cpp ../src/iibmalloc_linux.cpp -std=c++11 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-empty-body -DNDEBUG -O3 -flto -lpthread -o alloc.bin
+clang++-6.0 ../src/other_staff/test_common.cpp ../src/other_staff/random_test.cpp ../src/iibmalloc/page_allocator_linux.cpp ../src/iibmalloc/iibmalloc_linux.cpp -std=c++11 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-empty-body -DNDEBUG -O3 -flto -lpthread -o alloc.bin

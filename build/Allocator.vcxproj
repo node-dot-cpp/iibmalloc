@@ -22,8 +22,6 @@
     <ClInclude Include="..\src\iibmalloc\iibmalloc.h" />
     <ClInclude Include="..\src\iibmalloc\iibmalloc_common.h" />
     <ClInclude Include="..\src\iibmalloc\iibmalloc_page_allocator.h" />
-    <ClInclude Include="..\src\iibmalloc\page_allocator.h" />
-    <ClInclude Include="..\src\iibmalloc\page_allocator_with_map.h" />
     <ClInclude Include="..\src\other_staff\random_test.h" />
     <ClInclude Include="..\src\other_staff\test_common.h" />
   </ItemGroup>

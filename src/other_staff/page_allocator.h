@@ -51,8 +51,6 @@
 #endif
 #endif // GET_PERF_DATA
 
-constexpr uint8_t CACHE_LINE_ALIGNMENT_EXP = sizeToExp(64);
-
 
 /* OS specific implementations */
 class VirtualMemory
@@ -84,25 +82,12 @@ struct MemoryBlockListItem
 	SizeT size;
 	SizeT sizeIndex;
 
-	enum BucketKinds :uint8_t
-	{
-		NoBucket = 0,
-		SmallBucket,
-		MediumBucket
-	} bucketKind = NoBucket;
-
-
-	BucketKinds getBucketKind() const { return bucketKind; }
-	void setBucketKind(BucketKinds kind) { bucketKind = kind; }
-
-
 	void initialize(SizeT sz, SizeT szIndex)
 	{
 		size = sz;
 		prev = nullptr;
 		next = nullptr;
 		sizeIndex = szIndex;
-		bucketKind = NoBucket;
 	}
 
 	void listInitializeEmpty()
@@ -290,8 +275,6 @@ struct BlockStats
 
 struct PageAllocator // rather a proof of concept
 {
-	static constexpr size_t OVERHEAD = alignUpExp(sizeof(MemoryBlockListItem), CACHE_LINE_ALIGNMENT_EXP);
-
 	BlockStats stats;
 	uint8_t blockSizeExp = 0;
 
@@ -302,7 +285,7 @@ public:
 		this->blockSizeExp = blockSizeExp;
 	}
 
-	MemoryBlockListItem* getFreeBlockInt(size_t sz)
+	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
 		stats.registerAllocRequest( sz );
 
@@ -320,27 +303,14 @@ public:
 			chk->initialize(sz, 0);
 			return chk;
 		}
+		//todo enlarge top chunk
 
 		throw std::bad_alloc();
 	}
 
-	void* getFreeBlock(size_t sz)
+
+	void freeChunk( MemoryBlockListItem* chk )
 	{
-		size_t chkSz = alignUpExp(sz + OVERHEAD, blockSizeExp);
-
-		MemoryBlockListItem* chk = getFreeBlockInt(chkSz);
-
-		return reinterpret_cast<uint8_t*>(chk) + OVERHEAD;
-	}
-
-	MemoryBlockListItem* getBucketBlock(size_t sz)
-	{
-		return getFreeBlockInt(sz);
-	}
-
-	void freeChunk(void* ptr)
-	{
-		MemoryBlockListItem* chk = reinterpret_cast<MemoryBlockListItem*>(ptr);
 		size_t ix = chk->getSizeIndex();
 		assert ( ix == 0 );
 
@@ -354,8 +324,6 @@ public:
 	}
 
 	const BlockStats& getStats() const { return stats; }
-
-	void doHouseKeeping() {}
 
 	void printStats()
 	{
@@ -381,14 +349,13 @@ public:
 };
 
 
-constexpr size_t max_cached_size = 32; // # of pages
-constexpr size_t single_page_cache_size = 8;
+constexpr size_t max_cached_size = 20; // # of pages
+constexpr size_t single_page_cache_size = 32;
 constexpr size_t multi_page_cache_size = 4;
 
 struct PageAllocatorWithCaching // to be further developed for practical purposes
 {
-	static constexpr size_t OVERHEAD = alignUpExp(sizeof(MemoryBlockListItem), CACHE_LINE_ALIGNMENT_EXP);
-	//	Chunk* topChunk = nullptr;
+//	Chunk* topChunk = nullptr;
 	std::array<MemoryBlockList, max_cached_size+1> freeBlocks;
 
 	BlockStats stats;
@@ -422,7 +389,7 @@ public:
 		}
 	}
 
-	MemoryBlockListItem* getFreeBlockInt(size_t sz)
+	MemoryBlockListItem* getFreeBlock(size_t sz)
 	{
 		stats.registerAllocRequest( sz );
 
@@ -457,20 +424,6 @@ public:
 		throw std::bad_alloc();
 	}
 
-	void* getFreeBlock(size_t sz)
-	{
-		size_t chkSz = alignUpExp(sz + OVERHEAD, blockSizeExp);
-
-		MemoryBlockListItem* chk = getFreeBlockInt(chkSz);
-
-		return reinterpret_cast<uint8_t*>(chk) + OVERHEAD;
-	}
-
-	MemoryBlockListItem* getBucketBlock(size_t sz)
-	{
-		return getFreeBlockInt(sz);
-	}
-
 	void* getFreeBlockNoCache(size_t sz)
 	{
 		stats.registerAllocRequest( sz );
@@ -489,15 +442,15 @@ public:
 	}
 
 
-	void freeChunk( void* ptr )
+	void freeChunk( MemoryBlockListItem* chk )
 	{
 //		assert(!chk->isFree());
 //		assert(!chk->isInList());
 
-		MemoryBlockListItem* chk = reinterpret_cast<MemoryBlockListItem*>(ptr);
 		size_t sz = chk->getSize();
 		stats.registerDeallocRequest( sz );
-		size_t ix = chk->getSizeIndex();
+//		size_t ix = chk->getSizeIndex();
+		size_t ix = (sz >> blockSizeExp)-1;
 		if ( ix == 0 ) // quite likely case (all bucket chunks)
 		{
 			if ( freeBlocks[ix].getCount() < single_page_cache_size )
@@ -630,8 +583,6 @@ public:
 	}
 
 	const BlockStats& getStats() const { return stats; }
-
-	void doHouseKeeping() {}
 
 	void printStats()
 	{

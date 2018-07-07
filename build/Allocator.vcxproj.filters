@@ -23,12 +23,6 @@
     <ClInclude Include="..\src\iibmalloc\iibmalloc_page_allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\iibmalloc\page_allocator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\iibmalloc\page_allocator_with_map.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\other_staff\random_test.h">
       <Filter>Header Files</Filter>
     </ClInclude>

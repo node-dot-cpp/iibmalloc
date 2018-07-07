@@ -41,7 +41,7 @@
 #include <vector> // potentially, a temporary solution
 
 #include "iibmalloc_common.h"
-#include "page_allocator.h"
+#include "iibmalloc_page_allocator.h"
 
 
 class SerializableAllocatorBase;

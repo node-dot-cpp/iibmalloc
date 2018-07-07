@@ -19,32 +19,31 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\bucket_allocator.h" />
-    <ClInclude Include="..\src\iibmalloc_common.h" />
-    <ClInclude Include="..\src\iibmalloc.h" />
-    <ClInclude Include="..\src\iibmalloc_page_allocator.h" />
-    <ClInclude Include="..\src\page_allocator.h" />
-    <ClInclude Include="..\src\page_allocator_with_map.h" />
-    <ClInclude Include="..\src\random_test.h" />
-    <ClInclude Include="..\src\test_common.h" />
+    <ClInclude Include="..\src\iibmalloc\iibmalloc.h" />
+    <ClInclude Include="..\src\iibmalloc\iibmalloc_common.h" />
+    <ClInclude Include="..\src\iibmalloc\iibmalloc_page_allocator.h" />
+    <ClInclude Include="..\src\iibmalloc\page_allocator.h" />
+    <ClInclude Include="..\src\iibmalloc\page_allocator_with_map.h" />
+    <ClInclude Include="..\src\other_staff\random_test.h" />
+    <ClInclude Include="..\src\other_staff\test_common.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\bucket_allocator_linux.cpp">
+    <ClCompile Include="..\src\iibmalloc\iibmalloc_linux.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\src\bucket_allocator_windows.cpp" />
-    <ClCompile Include="..\src\page_allocator_linux.cpp">
+    <ClCompile Include="..\src\iibmalloc\iibmalloc_windows.cpp" />
+    <ClCompile Include="..\src\iibmalloc\page_allocator_linux.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\src\page_allocator_windows.cpp" />
-    <ClCompile Include="..\src\random_test.cpp" />
-    <ClCompile Include="..\src\test_common.cpp" />
+    <ClCompile Include="..\src\iibmalloc\page_allocator_windows.cpp" />
+    <ClCompile Include="..\src\other_staff\random_test.cpp" />
+    <ClCompile Include="..\src\other_staff\test_common.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{05669973-794E-41A6-98EA-819209C57BBA}</ProjectGuid>

@@ -1,3 +1,4 @@
+
 /* -------------------------------------------------------------------------------
  * Copyright (c) 2018, OLogN Technologies AG
  * All rights reserved.
@@ -60,8 +61,8 @@ public:
 	static size_t getAllocGranularity();
 
 	static unsigned char* reserve(void* addr, size_t size);
-	static void commit(uintptr_t addr, size_t size);
-	static void decommit(uintptr_t addr, size_t size);
+	static void commit(uintptr_t addr, size_t size); // TODO: revise necessity (duplicates might beavailable)
+	static void decommit(uintptr_t addr, size_t size); // TODO: revise necessity (duplicates might be available)
 
 	static void* allocate(size_t size);
 	static void deallocate(void* ptr, size_t size);

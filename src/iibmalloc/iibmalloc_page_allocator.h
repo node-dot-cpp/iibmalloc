@@ -65,7 +65,6 @@ public:
 
 	static void* allocate(size_t size);
 	static void deallocate(void* ptr, size_t size);
-//	static void release(void* addr);
 
 	static void* AllocateAddressSpace(size_t size);
 	static void* CommitMemory(void* addr, size_t size);
@@ -78,7 +77,6 @@ struct MemoryBlockListItem
 	MemoryBlockListItem* next;
 	MemoryBlockListItem* prev;
 	typedef size_t SizeT; //todo
-//	static constexpr SizeT INUSE_FLAG = 1;
 	SizeT size;
 	SizeT sizeIndex;
 
@@ -145,7 +143,6 @@ struct MemoryBlockListItem
 
 
 };
-
 
 class MemoryBlockList
 {
@@ -303,7 +300,6 @@ public:
 			chk->initialize(sz, 0);
 			return chk;
 		}
-		//todo enlarge top chunk
 
 		throw std::bad_alloc();
 	}
@@ -402,8 +398,6 @@ public:
 			{
 				MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(freeBlocks[ix].popFront());
 				chk->initialize(sz, ix);
-//				assert(chk->isFree());
-//				chk->setInUse();
 				return chk;
 			}
 		}
@@ -440,29 +434,22 @@ public:
 
 		throw std::bad_alloc();
 	}
-
-
+	
 	void freeChunk( MemoryBlockListItem* chk )
 	{
-//		assert(!chk->isFree());
-//		assert(!chk->isInList());
-
 		size_t sz = chk->getSize();
 		stats.registerDeallocRequest( sz );
-//		size_t ix = chk->getSizeIndex();
 		size_t ix = (sz >> blockSizeExp)-1;
 		if ( ix == 0 ) // quite likely case (all bucket chunks)
 		{
 			if ( freeBlocks[ix].getCount() < single_page_cache_size )
 			{
-//				chk->setFree();
 				freeBlocks[ix].pushFront(chk);
 				return;
 			}
 		}
 		else if ( ix < max_cached_size && freeBlocks[ix].getCount() < multi_page_cache_size )
 		{
-//			chk->setFree();
 			freeBlocks[ix].pushFront(chk);
 			return;
 		}
@@ -475,9 +462,6 @@ public:
 
 	void freeChunkNoCache( void* block, size_t sz )
 	{
-//		assert(!chk->isFree());
-//		assert(!chk->isInList());
-
 		stats.registerDeallocRequest( sz );
 
 		uint64_t start = __rdtsc();
@@ -516,101 +500,5 @@ public:
 		VirtualMemory::FreeAddressSpace( addr, size );
 	}
 };
-
-struct PageAllocatorNoCachingForTestPurposes // to be further developed for practical purposes
-{
-	uint8_t* basePtr = nullptr;
-	uint8_t* currentPtr = nullptr;
-	BlockStats stats;
-	uint8_t blockSizeExp = 0;
-	size_t allocFixedSize;
-
-public:
-
-	void initialize(uint8_t blockSizeExp)
-	{
-		this->blockSizeExp = blockSizeExp;
-		allocFixedSize = (1 << 30);
-		uint64_t start = __rdtsc();
-		basePtr = reinterpret_cast<uint8_t*>( VirtualMemory::allocate(allocFixedSize) );
-		uint64_t end = __rdtsc();
-		stats.registerSysAlloc( allocFixedSize, end - start );
-		currentPtr = basePtr;
-	}
-
-	void deinitialize()
-	{
-		uint64_t start = __rdtsc();
-		VirtualMemory::deallocate( basePtr, allocFixedSize );
-		uint64_t end = __rdtsc();
-		stats.registerSysDealloc( allocFixedSize, end - start );
-		currentPtr = nullptr;
-	}
-
-	MemoryBlockListItem* getFreeBlock(size_t sz)
-	{
-		MemoryBlockListItem* ret = reinterpret_cast<MemoryBlockListItem*>(currentPtr);
-		currentPtr += sz;
-		if ( currentPtr > basePtr + allocFixedSize )
-		{
-			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
-			throw std::bad_alloc();
-		}
-		return ret;
-	}
-
-	void* getFreeBlockNoCache(size_t sz)
-	{
-		MemoryBlockListItem* ret = reinterpret_cast<MemoryBlockListItem*>(currentPtr);
-		currentPtr += sz;
-		if ( currentPtr > basePtr + allocFixedSize )
-		{
-			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
-			throw std::bad_alloc();
-		}
-		return ret;
-	}
-
-
-	void freeChunk( MemoryBlockListItem* chk )
-	{
-//		throw std::bad_alloc();
-	}
-
-	void freeChunkNoCache( void* block, size_t sz )
-	{
-//		throw std::bad_alloc();
-	}
-
-	const BlockStats& getStats() const { return stats; }
-
-	void printStats()
-	{
-		stats.printStats();
-	}
-
-	void* AllocateAddressSpace(size_t size)
-	{
-		void* ret = currentPtr;
-		currentPtr += size;
-		if ( currentPtr > basePtr + allocFixedSize )
-		{
-			printf( "Total amount of memory requested exceeds 0x%zx\n", allocFixedSize );
-			throw std::bad_alloc();
-		}
-		return ret;
-	}
-	void* CommitMemory(void* addr, size_t size)
-	{
-		return addr;
-	}
-	void DecommitMemory(void* addr, size_t size)
-	{
-	}
-	void FreeAddressSpace(void* addr, size_t size)
-	{
-	}
-};
-
 
 #endif //PAGE_ALLOCATOR_H

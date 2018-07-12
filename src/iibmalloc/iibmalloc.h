@@ -1103,4 +1103,91 @@ public:
 	}
 };
 
+
+class SafeIibAllocator : protected IibAllocatorBase
+{
+protected:
+	void* zombiBuckets[BucketCount];
+	void** zombiLargeChunks;
+	
+public:
+	SafeIibAllocator() { initialize(); }
+	SafeIibAllocator(const SafeIibAllocator&) = delete;
+	SafeIibAllocator(SafeIibAllocator&&) = default;
+	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
+	SafeIibAllocator& operator=(SafeIibAllocator&&) = default;
+
+	void enable() {}
+	void disable() {}
+
+
+	FORCE_INLINE void* uncheckedAlloc(size_t sz)
+	{
+		return IibAllocatorBase::allocate( sz );
+	}
+
+	FORCE_INLINE void uncheckedDelloc(void* ptr )
+	{
+		IibAllocatorBase::deallocate( ptr );
+	}
+
+	FORCE_INLINE void* allocate(size_t sz)
+	{
+		void* ret = IibAllocatorBase::allocate( sz + sizeof(void*) );
+		return reinterpret_cast<void**>(ret) + 1;
+	}
+
+	FORCE_INLINE void deallocate(void* userPtr)
+	{
+		void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		if(ptr)
+		{
+			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
+			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
+			if ( offsetInPage != memForbidden ) // small and medium size
+			{
+				size_t idx = PageAllocatorT::addressToIdx( ptr );
+				*reinterpret_cast<void**>( ptr ) = buckets[idx];
+				buckets[idx] = ptr;
+			}
+			else
+			{
+				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
+				*reinterpret_cast<void**>( pageStart ) = *zombiLargeChunks;
+				*zombiLargeChunks = pageStart;
+			}
+		}
+	}
+	
+	const BlockStats& getStats() const { return pageAllocator.getStats(); }
+	
+	void printStats()
+	{
+		pageAllocator.printStats();
+	}
+
+	void initialize(size_t size)
+	{
+		initialize();
+	}
+
+	void initialize()
+	{
+		IibAllocatorBase::initialize();
+		for ( size_t i=0; i<BucketCount; ++i)
+			zombiBuckets[i] = zombiBuckets + i;
+		*zombiLargeChunks = &zombiLargeChunks;
+	}
+
+	void deinitialize()
+	{
+		IibAllocatorBase::deinitialize();
+	}
+
+	~SafeIibAllocator()
+	{
+	}
+};
+
+
 #endif // IIBMALLOC_H

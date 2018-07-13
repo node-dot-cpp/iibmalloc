@@ -1105,7 +1105,7 @@ class SafeIibAllocator : protected IibAllocatorBase
 protected:
 	void** zombiBucketsFirst[BucketCount];
 	void** zombiBucketsLast[BucketCount];
-	void** zombiLargeChunks;
+	void* zombiLargeChunks;
 	
 public:
 	SafeIibAllocator() { initialize(); }
@@ -1152,7 +1152,7 @@ public:
 				}
 				else
 				{
-					*(zombiBucketsFirst[idx]) = ptr;
+					zombiBucketsFirst[idx] = reinterpret_cast<void**>( ptr );
 					if ( zombiBucketsLast[idx] )
 						*(zombiBucketsLast[idx]) = ptr;
 					zombiBucketsLast[idx] = reinterpret_cast<void**>( ptr );
@@ -1160,9 +1160,8 @@ public:
 			}
 			else
 			{
-				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
-				*reinterpret_cast<void**>( pageStart ) = *zombiLargeChunks;
-				*zombiLargeChunks = pageStart;
+				*reinterpret_cast<void**>( ptr ) = zombiLargeChunks;
+				zombiLargeChunks = ptr;
 			}
 		}
 	}
@@ -1179,11 +1178,12 @@ public:
 			zombiBucketsFirst[idx] = nullptr;
 			zombiBucketsLast[idx] = nullptr;
 		}
-		while ( *zombiLargeChunks != zombiLargeChunks )
+		while ( zombiLargeChunks != nullptr )
 		{
-			void* next = *zombiLargeChunks;
-			bulkAllocator.deallocate( *zombiLargeChunks );
-			*zombiLargeChunks = next;
+			void* next = *reinterpret_cast<void**>( zombiLargeChunks );
+			void* pageStart = PageAllocatorT::ptrToPageStart( zombiLargeChunks );
+			bulkAllocator.deallocate( pageStart );
+			zombiLargeChunks = next;
 		}
 	}
 	
@@ -1204,7 +1204,7 @@ public:
 			zombiBucketsFirst[i] = nullptr;
 			zombiBucketsLast[i] = nullptr;
 		}
-		*zombiLargeChunks = &zombiLargeChunks;
+		zombiLargeChunks = nullptr;
 	}
 
 	void deinitialize()

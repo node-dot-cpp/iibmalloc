@@ -1167,7 +1167,7 @@ public:
 		}
 	}
 
-	FORCE_INLINE void killAllZobies()
+	FORCE_INLINE void killAllZombies()
 	{
 		for ( size_t idx=0; idx<BucketCount; ++idx)
 		{
@@ -1176,8 +1176,8 @@ public:
 				*(zombiBucketsLast[idx]) = buckets[idx];
 				buckets[idx] = *(zombiBucketsFirst[idx]);
 			}
-			*(zombiBucketsFirst[idx]) = nullptr;
-			*(zombiBucketsLast[idx]) = nullptr;
+			zombiBucketsFirst[idx] = nullptr;
+			zombiBucketsLast[idx] = nullptr;
 		}
 		while ( *zombiLargeChunks != zombiLargeChunks )
 		{
@@ -1201,8 +1201,8 @@ public:
 		IibAllocatorBase::initialize();
 		for ( size_t i=0; i<BucketCount; ++i)
 		{
-			*(zombiBucketsFirst[i]) = nullptr;
-			*(zombiBucketsLast[i]) = nullptr;
+			zombiBucketsFirst[i] = nullptr;
+			zombiBucketsLast[i] = nullptr;
 		}
 		*zombiLargeChunks = &zombiLargeChunks;
 	}
@@ -1218,7 +1218,8 @@ public:
 };
 
 
-typedef IibAllocatorBase ThreadLocalAllocatorT;
+//typedef IibAllocatorBase ThreadLocalAllocatorT;
+typedef SafeIibAllocator ThreadLocalAllocatorT;
 extern thread_local ThreadLocalAllocatorT g_AllocManager;
 
 

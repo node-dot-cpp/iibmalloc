@@ -235,7 +235,7 @@ struct BlockStats
 	uint64_t deallocRequestCount = 0;
 	uint64_t deallocRequestSize = 0;
 
-	void printStats()
+	void printStats() const
 	{
 		printf("Allocs %zd (%zd), ", sysAllocCount, sysAllocSize);
 		printf("Deallocs %zd (%zd), ", sysDeallocCount, sysDeallocSize);
@@ -473,7 +473,7 @@ public:
 
 	const BlockStats& getStats() const { return stats; }
 
-	void printStats()
+	void printStats() const
 	{
 		stats.printStats();
 	}

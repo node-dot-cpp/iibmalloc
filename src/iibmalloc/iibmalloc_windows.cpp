@@ -42,7 +42,7 @@
 
 #include <windows.h>
 
-thread_local IibAllocatorBase g_AllocManager;
+thread_local ThreadLocalAllocatorT g_AllocManager;
 
 void* operator new(std::size_t count)
 {

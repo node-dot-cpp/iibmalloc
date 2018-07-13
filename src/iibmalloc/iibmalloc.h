@@ -44,10 +44,6 @@
 #include "iibmalloc_page_allocator.h"
 
 
-class IibAllocatorBase;
-extern thread_local IibAllocatorBase g_AllocManager;
-
-
 constexpr size_t ALIGNMENT = 2 * sizeof(uint64_t);
 constexpr uint8_t ALIGNMENT_EXP = sizeToExp(ALIGNMENT);
 static_assert( ( 1 << ALIGNMENT_EXP ) == ALIGNMENT, "" );
@@ -1074,7 +1070,7 @@ public:
 	
 	const BlockStats& getStats() const { return pageAllocator.getStats(); }
 	
-	void printStats()
+	void printStats() const 
 	{
 		pageAllocator.printStats();
 	}
@@ -1107,7 +1103,8 @@ public:
 class SafeIibAllocator : protected IibAllocatorBase
 {
 protected:
-	void** zombiBuckets[BucketCount];
+	void** zombiBucketsFirst[BucketCount];
+	void** zombiBucketsLast[BucketCount];
 	void** zombiLargeChunks;
 	
 public:
@@ -1147,8 +1144,19 @@ public:
 			if ( offsetInPage != memForbidden ) // small and medium size
 			{
 				size_t idx = PageAllocatorT::addressToIdx( ptr );
-				*reinterpret_cast<void**>( ptr ) = buckets[idx];
-				buckets[idx] = ptr;
+				if ( zombiBucketsFirst[idx] ) // LIKELY
+				{
+					if ( zombiBucketsLast[idx] )
+						*(zombiBucketsLast[idx]) = ptr;
+					zombiBucketsLast[idx] = reinterpret_cast<void**>( ptr );
+				}
+				else
+				{
+					*(zombiBucketsFirst[idx]) = ptr;
+					if ( zombiBucketsLast[idx] )
+						*(zombiBucketsLast[idx]) = ptr;
+					zombiBucketsLast[idx] = reinterpret_cast<void**>( ptr );
+				}
 			}
 			else
 			{
@@ -1158,13 +1166,30 @@ public:
 			}
 		}
 	}
-	
-	const BlockStats& getStats() const { return pageAllocator.getStats(); }
-	
-	void printStats()
+
+	FORCE_INLINE void killAllZobies()
 	{
-		pageAllocator.printStats();
+		for ( size_t idx=0; idx<BucketCount; ++idx)
+		{
+			if ( zombiBucketsLast[idx] )
+			{
+				*(zombiBucketsLast[idx]) = buckets[idx];
+				buckets[idx] = *(zombiBucketsFirst[idx]);
+			}
+			*(zombiBucketsFirst[idx]) = nullptr;
+			*(zombiBucketsLast[idx]) = nullptr;
+		}
+		while ( *zombiLargeChunks != zombiLargeChunks )
+		{
+			void* next = *zombiLargeChunks;
+			bulkAllocator.deallocate( *zombiLargeChunks );
+			*zombiLargeChunks = next;
+		}
 	}
+	
+	const BlockStats& getStats() const { return IibAllocatorBase::getStats(); }
+	
+	void printStats() const { IibAllocatorBase::printStats(); }
 
 	void initialize(size_t size)
 	{
@@ -1175,7 +1200,10 @@ public:
 	{
 		IibAllocatorBase::initialize();
 		for ( size_t i=0; i<BucketCount; ++i)
-			*(zombiBuckets[i]) = zombiBuckets + i;
+		{
+			*(zombiBucketsFirst[i]) = nullptr;
+			*(zombiBucketsLast[i]) = nullptr;
+		}
 		*zombiLargeChunks = &zombiLargeChunks;
 	}
 
@@ -1188,6 +1216,10 @@ public:
 	{
 	}
 };
+
+
+typedef IibAllocatorBase ThreadLocalAllocatorT;
+extern thread_local ThreadLocalAllocatorT g_AllocManager;
 
 
 #endif // IIBMALLOC_H

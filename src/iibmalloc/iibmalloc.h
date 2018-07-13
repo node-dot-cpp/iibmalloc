@@ -1107,7 +1107,7 @@ public:
 class SafeIibAllocator : protected IibAllocatorBase
 {
 protected:
-	void* zombiBuckets[BucketCount];
+	void** zombiBuckets[BucketCount];
 	void** zombiLargeChunks;
 	
 public:
@@ -1175,7 +1175,7 @@ public:
 	{
 		IibAllocatorBase::initialize();
 		for ( size_t i=0; i<BucketCount; ++i)
-			zombiBuckets[i] = zombiBuckets + i;
+			*(zombiBuckets[i]) = zombiBuckets + i;
 		*zombiLargeChunks = &zombiLargeChunks;
 	}
 

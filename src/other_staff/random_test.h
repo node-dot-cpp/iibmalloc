@@ -272,6 +272,7 @@ public:
 	void deinit() {}
 
 	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverWithinMainLoopPhase() {}
 	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
 	void doWhateverAfterCleanupPhase()
 	{
@@ -301,12 +302,14 @@ public:
 	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
 	void deinit()
 	{
+		g_AllocManager.killAllZombies();
 		g_AllocManager.deinitialize();
 		g_AllocManager.disable();
 	}
 
 	void doWhateverAfterSetupPhase()
 	{
+		g_AllocManager.killAllZombies();
 		testRes->rdtscSetup = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().sysAllocCount;
@@ -316,8 +319,14 @@ public:
 		testRes->deallocRequestCountAfterSetup = g_AllocManager.getStats().deallocRequestCount;
 	}
 
+	void doWhateverWithinMainLoopPhase()
+	{
+		g_AllocManager.killAllZombies();
+	}
+
 	void doWhateverAfterMainLoopPhase()
 	{
+		g_AllocManager.killAllZombies();
 		testRes->rdtscMainLoop = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().sysAllocCount;
@@ -329,6 +338,7 @@ public:
 
 	void doWhateverAfterCleanupPhase()
 	{
+		g_AllocManager.killAllZombies();
 		testRes->rdtscExit = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().sysAllocCount;
@@ -365,6 +375,7 @@ public:
 	void deinit() { if ( fakeBuffer ) delete [] fakeBuffer; fakeBuffer = nullptr; }
 
 	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverWithinMainLoopPhase() {}
 	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
 	void doWhateverAfterCleanupPhase()
 	{
@@ -479,51 +490,55 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	allocatorUnderTest.doWhateverAfterSetupPhase();
 
 	// main loop
-	for ( size_t j=0;j<iterCount; ++j )
+	for ( size_t j=0;j<iterCount/10000; ++j )
 	{
-		size_t randNum = rng64();
-//		size_t idx = randNum % maxItems;
-		uint32_t rnum1 = (uint32_t)randNum;
-		uint32_t rnum2 = (uint32_t)(randNum >> 32);
-		size_t idx = Pareto_80_20_6_Rand( paretoData, rnum1, rnum2 );
-		if ( baseBuff[idx].ptr )
+		for ( size_t k=0;k<10000; ++k )
 		{
-			if constexpr ( doMemAccess )
+			size_t randNum = rng64();
+	//		size_t idx = randNum % maxItems;
+			uint32_t rnum1 = (uint32_t)randNum;
+			uint32_t rnum2 = (uint32_t)(randNum >> 32);
+			size_t idx = Pareto_80_20_6_Rand( paretoData, rnum1, rnum2 );
+			if ( baseBuff[idx].ptr )
 			{
-				if constexpr ( doFullAccess )
+				if constexpr ( doMemAccess )
 				{
-					size_t i=0;
-					for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
-						dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
-					uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
-					for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
-						dummyCtr += tail[i];
+					if constexpr ( doFullAccess )
+					{
+						size_t i=0;
+						for ( ; i<baseBuff[idx].sz/sizeof(size_t ); ++i )
+							dummyCtr += ( reinterpret_cast<size_t*>( baseBuff[idx].ptr) )[i];
+						uint8_t* tail = baseBuff[idx].ptr + i * sizeof(size_t );
+						for ( i=0; i<baseBuff[idx].sz % sizeof(size_t); ++i )
+							dummyCtr += tail[i];
+					}
+					else
+					{
+						static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+						dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+					}
 				}
-				else
+				allocatorUnderTest.deallocate( baseBuff[idx].ptr );
+				baseBuff[idx].ptr = 0;
+			}
+			else
+			{
+				size_t sz = calcSizeWithStatsAdjustment( rng64(), maxItemSizeExp );
+				baseBuff[idx].sz = sz;
+				baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
+				if constexpr ( doMemAccess )
 				{
-					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
-					dummyCtr += baseBuff[idx].ptr[baseBuff[idx].sz/2];
+					if constexpr ( doFullAccess )
+						memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
+					else
+					{
+						static_assert( mat == MEM_ACCESS_TYPE::single, "" );
+						baseBuff[idx].ptr[sz/2] = (uint8_t)sz;
+					}
 				}
 			}
-			allocatorUnderTest.deallocate( baseBuff[idx].ptr );
-			baseBuff[idx].ptr = 0;
 		}
-		else
-		{
-			size_t sz = calcSizeWithStatsAdjustment( rng64(), maxItemSizeExp );
-			baseBuff[idx].sz = sz;
-			baseBuff[idx].ptr = reinterpret_cast<uint8_t*>( allocatorUnderTest.allocate( sz ) );
-			if constexpr ( doMemAccess )
-			{
-				if constexpr ( doFullAccess )
-					memset( baseBuff[idx].ptr, (uint8_t)sz, sz );
-				else
-				{
-					static_assert( mat == MEM_ACCESS_TYPE::single, "" );
-					baseBuff[idx].ptr[sz/2] = (uint8_t)sz;
-				}
-			}
-		}
+		allocatorUnderTest.doWhateverWithinMainLoopPhase();
 	}
 	allocatorUnderTest.doWhateverAfterMainLoopPhase();
 

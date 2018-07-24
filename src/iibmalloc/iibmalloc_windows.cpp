@@ -47,6 +47,9 @@ thread_local ThreadLocalAllocatorT g_AllocManager;
 void* operator new(std::size_t count)
 {
 	return g_AllocManager.allocate(count);
+/*	void * ret = g_AllocManager.allocate(count);
+	printf( "operator new is called with size = %zd; ptr = 0x%zx\n", count, (size_t)ret );
+	return ret;*/
 }
 
 void* operator new[](std::size_t count)
@@ -56,6 +59,7 @@ void* operator new[](std::size_t count)
 
 void operator delete(void* ptr) noexcept
 {
+//	printf( "operator delete is called for ptr = 0x%zx\n", (size_t)ptr );
 	g_AllocManager.deallocate(ptr);
 }
 

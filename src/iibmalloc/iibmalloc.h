@@ -44,10 +44,6 @@
 #include "iibmalloc_page_allocator.h"
 
 
-class SerializableAllocatorBase;
-extern thread_local SerializableAllocatorBase g_AllocManager;
-
-
 constexpr size_t ALIGNMENT = 2 * sizeof(uint64_t);
 constexpr uint8_t ALIGNMENT_EXP = sizeToExp(ALIGNMENT);
 static_assert( ( 1 << ALIGNMENT_EXP ) == ALIGNMENT, "" );
@@ -60,9 +56,6 @@ constexpr size_t PAGE_SIZE_MASK = expToMask(PAGE_SIZE_EXP);
 static_assert( ( 1 << PAGE_SIZE_EXP ) == PAGE_SIZE, "" );
 static_assert( 1 + PAGE_SIZE_MASK == PAGE_SIZE, "" );
 
-
-//#define USE_ITEM_HEADER
-#define USE_SOUNDING_PAGE_ADDRESS
 
 template<class BasePageAllocator, class ItemT>
 class CollectionInPages : public BasePageAllocator
@@ -153,7 +146,6 @@ public:
 	}
 };
 
-#ifdef USE_SOUNDING_PAGE_ADDRESS
 template<class BasePageAllocator, size_t bucket_cnt_exp, size_t reservation_size_exp, size_t commit_page_cnt_exp, size_t multipage_page_cnt_exp>
 class SoundingAddressPageAllocator : public BasePageAllocator
 {
@@ -431,7 +423,6 @@ public:
 		BasePageAllocator::deinitialize();
 	}
 };
-#endif
 
 
 //#define BULKALLOCATOR_HEAVY_DEBUG
@@ -767,7 +758,7 @@ public:
 #define USE_HALF_EXP_BUCKET_SIZES
 //#define USE_QUAD_EXP_BUCKET_SIZES
 
-class SerializableAllocatorBase
+class IibAllocatorBase
 {
 protected:
 	static constexpr size_t MaxBucketSize = PAGE_SIZE * 2;
@@ -775,42 +766,12 @@ protected:
 	static constexpr size_t BucketCount = 1 << BucketCountExp;
 	void* buckets[BucketCount];
 
-	struct ChunkHeader
-	{
-		MemoryBlockListItem block;
-		ChunkHeader* next;
-		size_t idx;
-	};
-	
 	static constexpr size_t reservation_size_exp = 23;
 	typedef BulkAllocator<PageAllocatorWithCaching, 1 << reservation_size_exp, 32> BulkAllocatorT;
 	BulkAllocatorT bulkAllocator;
 
-#ifdef USE_SOUNDING_PAGE_ADDRESS
 	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4, 3> PageAllocatorT;
-//	typedef SoundingAddressPageAllocator<PageAllocatorNoCachingForTestPurposes, BucketCountExp, reservation_size_exp, 4> PageAllocatorT;
 	PageAllocatorT pageAllocator;
-#else
-	PageAllocatorWithCaching pageAllocator;
-
-	ChunkHeader* nextPage = nullptr;
-
-	FORCE_INLINE
-	ChunkHeader* getChunkFromUsrPtr(void* ptr)
-	{
-		return reinterpret_cast<ChunkHeader*>(alignDownExp(reinterpret_cast<uintptr_t>(ptr), PAGE_SIZE_EXP));
-	}
-#endif
-
-#ifdef USE_ITEM_HEADER
-	static constexpr size_t large_block_idx = 0xFF;
-	struct ItemHeader
-	{
-		uint8_t idx;
-		uint8_t reserved[7];
-	};
-	static_assert( sizeof( ItemHeader ) == 8, "" );
-#endif // USE_ITEM_HEADER
 
 protected:
 public:
@@ -969,11 +930,11 @@ public:
 #endif
 	
 public:
-	SerializableAllocatorBase() { initialize(); }
-	SerializableAllocatorBase(const SerializableAllocatorBase&) = delete;
-	SerializableAllocatorBase(SerializableAllocatorBase&&) = default;
-	SerializableAllocatorBase& operator=(const SerializableAllocatorBase&) = delete;
-	SerializableAllocatorBase& operator=(SerializableAllocatorBase&&) = default;
+	IibAllocatorBase() { initialize(); }
+	IibAllocatorBase(const IibAllocatorBase&) = delete;
+	IibAllocatorBase(IibAllocatorBase&&) = default;
+	IibAllocatorBase& operator=(const IibAllocatorBase&) = delete;
+	IibAllocatorBase& operator=(IibAllocatorBase&&) = default;
 
 	void enable() {}
 	void disable() {}
@@ -1040,10 +1001,6 @@ public:
 #error Undefined bucket size schema
 #endif
 		assert( bucketSz >= sizeof( void* ) );
-#ifdef USE_SOUNDING_PAGE_ADDRESS
-#else
-#endif
-#ifdef USE_SOUNDING_PAGE_ADDRESS
 		PageAllocatorT::MultipageData mpData;
 //		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
 		pageAllocator.getMultipage( szidx, mpData );
@@ -1052,59 +1009,13 @@ public:
 		void* ret = buckets[szidx];
 		buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
 		return ret;
-#else
-		constexpr size_t memStart = 0;
-		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getFreeBlock( PAGE_SIZE ) );
-		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
-		ChunkHeader* h = reinterpret_cast<ChunkHeader*>( block );
-		h->idx = szidx;
-		h->next = nextPage;
-		nextPage = h;
-		uint8_t* mem = block + memStart;
-#ifdef USE_ITEM_HEADER
-		bucketSz += sizeof(ItemHeader);
-#endif // USE_ITEM_HEADER
-		size_t itemCnt = (PAGE_SIZE - memStart) / bucketSz;
-		assert( itemCnt );
-		for ( size_t i=bucketSz; i<(itemCnt-1)*bucketSz; i+=bucketSz )
-			*reinterpret_cast<void**>(mem + i) = mem + i + bucketSz;
-		*reinterpret_cast<void**>(mem + (itemCnt-1)*bucketSz) = nullptr;
-		buckets[szidx] = mem + bucketSz;
-#ifdef USE_ITEM_HEADER
-		reinterpret_cast<ItemHeader*>( mem )->idx = szidx;
-		return mem + sizeof( ItemHeader );
-#else
-		return mem;
-#endif // USE_ITEM_HEADER
-#endif
 	}
 
 	NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
 	{
-#ifdef USE_ITEM_HEADER
-		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ) + sizeof( ItemHeader ), ALIGNMENT_EXP );
-#elif defined USE_SOUNDING_PAGE_ADDRESS
-//		constexpr size_t memStart = alignUpExp( sizeof( size_t ), ALIGNMENT_EXP );
 		constexpr size_t memStart = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
-#else
-		constexpr size_t memStart = alignUpExp( sizeof( ChunkHeader ), ALIGNMENT_EXP );
-#endif // USE_ITEM_HEADER
-//		size_t fullSz = alignUpExp( sz + memStart, PAGE_SIZE_EXP );
-//		void* block = pageAllocator.getFreeBlock( fullSz );
 		void* block = bulkAllocator.allocate( sz + memStart );
 
-#ifdef USE_ITEM_HEADER
-#else
-/*		size_t allocatedSz = ( reinterpret_cast<MemoryBlockListItem*>( block ) )->getSize();
-		size_t* h = reinterpret_cast<size_t*>( block );
-//		*h = sz;
-		*h = allocatedSz;*/
-#endif
-
-//		usedNonBuckets.pushFront(chk);
-#ifdef USE_ITEM_HEADER
-		( reinterpret_cast<ItemHeader*>( reinterpret_cast<uint8_t*>(block) + memStart ) - 1 )->idx = large_block_idx;
-#endif // USE_ITEM_HEADER
 		return reinterpret_cast<uint8_t*>(block) + memStart;
 	}
 
@@ -1126,12 +1037,7 @@ public:
 			{
 				void* ret = buckets[szidx];
 				buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
-#ifdef USE_ITEM_HEADER
-				reinterpret_cast<ItemHeader*>( ret )->idx = szidx;
-				return reinterpret_cast<uint8_t*>(ret) + sizeof( ItemHeader );
-#else
 				return ret;
-#endif // USE_ITEM_HEADER
 			}
 			else
 				return allocateInCaseNoFreeBucket( sz, szidx );
@@ -1146,23 +1052,7 @@ public:
 	{
 		if(ptr)
 		{
-#ifdef USE_ITEM_HEADER
-			ItemHeader* ih = reinterpret_cast<ItemHeader*>(ptr) - 1;
-			if ( ih->idx != large_block_idx )
-			{
-				uint8_t idx = ih->idx;
-				*reinterpret_cast<void**>( ih ) = buckets[idx];
-				buckets[idx] = ih;
-			}
-			else
-			{
-				ChunkHeader* ch = getChunkFromUsrPtr( ptr );
-//				assert( reinterpret_cast<uint8_t*>(ch) == reinterpret_cast<uint8_t*>(ih) );
-				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(ch) );
-			}
-#elif defined USE_SOUNDING_PAGE_ADDRESS
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
-//			if ( offsetInPage != alignUpExp( sizeof( size_t ), ALIGNMENT_EXP ) )
 			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 			if ( offsetInPage != memForbidden )
 			{
@@ -1173,30 +1063,14 @@ public:
 			else
 			{
 				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
-/*				MemoryBlockListItem* h = reinterpret_cast<MemoryBlockListItem*>(pageStart);
-				h->size = *reinterpret_cast<size_t*>(pageStart);
-				h->sizeIndex = 0xFFFFFFFF; // TODO: address properly!!!
-				h->prev = nullptr;
-				h->next = nullptr;
-				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(h) );*/
 				bulkAllocator.deallocate( pageStart );
 			}
-#else
-			ChunkHeader* h = getChunkFromUsrPtr( ptr );
-			if ( h->idx != large_block_idx )
-			{
-				*reinterpret_cast<void**>( ptr ) = buckets[h->idx];
-				buckets[h->idx] = ptr;
-			}
-			else
-				pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(h) );
-#endif // USE_ITEM_HEADER
 		}
 	}
 	
 	const BlockStats& getStats() const { return pageAllocator.getStats(); }
 	
-	void printStats()
+	void printStats() const 
 	{
 		pageAllocator.printStats();
 	}
@@ -1215,24 +1089,138 @@ public:
 
 	void deinitialize()
 	{
-#ifdef USE_SOUNDING_PAGE_ADDRESS
-		// ...
-#else
-		while ( nextPage )
-		{
-			ChunkHeader* next = nextPage->next;
-			pageAllocator.freeChunk( reinterpret_cast<MemoryBlockListItem*>(nextPage) );
-			nextPage = next;
-		}
-#endif // USE_SOUNDING_PAGE_ADDRESS
 		pageAllocator.deinitialize();
 		bulkAllocator.deinitialize();
 	}
 
-	~SerializableAllocatorBase()
+	~IibAllocatorBase()
 	{
 		deinitialize();
 	}
 };
+
+
+class SafeIibAllocator : protected IibAllocatorBase
+{
+protected:
+	void** zombiBucketsFirst[BucketCount];
+	void** zombiBucketsLast[BucketCount];
+	void* zombiLargeChunks;
+	
+public:
+	SafeIibAllocator() { initialize(); }
+	SafeIibAllocator(const SafeIibAllocator&) = delete;
+	SafeIibAllocator(SafeIibAllocator&&) = default;
+	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
+	SafeIibAllocator& operator=(SafeIibAllocator&&) = default;
+
+	void enable() {}
+	void disable() {}
+
+
+	FORCE_INLINE void* uncheckedAlloc(size_t sz)
+	{
+		return IibAllocatorBase::allocate( sz );
+	}
+
+	FORCE_INLINE void uncheckedDelloc(void* ptr )
+	{
+		IibAllocatorBase::deallocate( ptr );
+	}
+
+	FORCE_INLINE void* allocate(size_t sz)
+	{
+		void* ret = IibAllocatorBase::allocate( sz + sizeof(void*) );
+		return reinterpret_cast<void**>(ret) + 1;
+	}
+
+	FORCE_INLINE void deallocate(void* userPtr)
+	{
+		void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		if(ptr)
+		{
+			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
+			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
+			if ( offsetInPage != memForbidden ) // small and medium size
+			{
+				size_t idx = PageAllocatorT::addressToIdx( ptr );
+				if ( zombiBucketsFirst[idx] ) // LIKELY
+				{
+					if ( zombiBucketsLast[idx] )
+						*(zombiBucketsLast[idx]) = ptr;
+					zombiBucketsLast[idx] = reinterpret_cast<void**>( ptr );
+				}
+				else
+				{
+					zombiBucketsFirst[idx] = reinterpret_cast<void**>( ptr );
+					if ( zombiBucketsLast[idx] )
+						*(zombiBucketsLast[idx]) = ptr;
+					zombiBucketsLast[idx] = reinterpret_cast<void**>( ptr );
+				}
+			}
+			else
+			{
+				*reinterpret_cast<void**>( ptr ) = zombiLargeChunks;
+				zombiLargeChunks = ptr;
+			}
+		}
+	}
+
+	FORCE_INLINE void killAllZombies()
+	{
+		for ( size_t idx=0; idx<BucketCount; ++idx)
+		{
+			if ( zombiBucketsLast[idx] )
+			{
+				*(zombiBucketsLast[idx]) = buckets[idx];
+				buckets[idx] = *(zombiBucketsFirst[idx]);
+			}
+			zombiBucketsFirst[idx] = nullptr;
+			zombiBucketsLast[idx] = nullptr;
+		}
+		while ( zombiLargeChunks != nullptr )
+		{
+			void* next = *reinterpret_cast<void**>( zombiLargeChunks );
+			void* pageStart = PageAllocatorT::ptrToPageStart( zombiLargeChunks );
+			bulkAllocator.deallocate( pageStart );
+			zombiLargeChunks = next;
+		}
+	}
+	
+	const BlockStats& getStats() const { return IibAllocatorBase::getStats(); }
+	
+	void printStats() const { IibAllocatorBase::printStats(); }
+
+	void initialize(size_t size)
+	{
+		initialize();
+	}
+
+	void initialize()
+	{
+		IibAllocatorBase::initialize();
+		for ( size_t i=0; i<BucketCount; ++i)
+		{
+			zombiBucketsFirst[i] = nullptr;
+			zombiBucketsLast[i] = nullptr;
+		}
+		zombiLargeChunks = nullptr;
+	}
+
+	void deinitialize()
+	{
+		IibAllocatorBase::deinitialize();
+	}
+
+	~SafeIibAllocator()
+	{
+	}
+};
+
+
+//typedef IibAllocatorBase ThreadLocalAllocatorT;
+typedef SafeIibAllocator ThreadLocalAllocatorT;
+extern thread_local ThreadLocalAllocatorT g_AllocManager;
+
 
 #endif // IIBMALLOC_H

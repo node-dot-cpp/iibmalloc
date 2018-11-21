@@ -46,7 +46,7 @@
 #include <fcntl.h>
 
 
-thread_local SerializableAllocatorBase g_AllocManager;
+thread_local ThreadLocalAllocatorT g_AllocManager;
 
 
 void* operator new(std::size_t count)

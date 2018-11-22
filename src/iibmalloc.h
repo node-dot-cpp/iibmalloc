@@ -1147,8 +1147,11 @@ public:
 
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
 
+constexpr size_t guaranteed_prefix_size = 8;
+
 class SafeIibAllocator : protected IibAllocatorBase
 {
+	static_assert( guaranteed_prefix_size >= sizeof(void*) ); // required to keep zombie list item pointer 'next' inside a block
 protected:
 	void** zombieBucketsFirst[BucketCount];
 	void** zombieBucketsLast[BucketCount];
@@ -1180,21 +1183,16 @@ public:
 		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( ptr );
 	}
 
-	FORCE_INLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
-	{
-		void* trueAllocatedPtr = reinterpret_cast<void**>(allocatedPtr) - 1;
-		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
-	}
-
 	FORCE_INLINE void* zombieableAllocate(size_t sz)
 	{
-		void* ret = IibAllocatorBase::allocate( sz + sizeof(void*) );
-		return reinterpret_cast<void**>(ret) + 1;
+		void* ret = IibAllocatorBase::allocate( sz + guaranteed_prefix_size );
+		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
 	}
 
 	FORCE_INLINE void zombieableDeallocate(void* userPtr)
 	{
-		void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		//void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		void* ptr = reinterpret_cast<uint8_t*>(userPtr) - guaranteed_prefix_size;
 		if(ptr)
 		{
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
@@ -1222,6 +1220,12 @@ public:
 				zombieLargeChunks = ptr;
 			}
 		}
+	}
+
+	FORCE_INLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
+	{
+		void* trueAllocatedPtr = reinterpret_cast<void**>(allocatedPtr) - 1;
+		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
 	}
 
 	FORCE_INLINE void killAllZombies()

@@ -217,7 +217,7 @@ int main()
 		memset( testRes, 0, sizeof( testRes ) );
 
 		TestStartupParamsAndResults params;
-		params.startupParams.iterCount = 100000000;
+		params.startupParams.iterCount = 100000;
 		params.startupParams.maxItemSize = 16;
 //		params.startupParams.maxItems = 23 << 20;
 		params.startupParams.maxItemSize2 = 16;
@@ -230,7 +230,7 @@ int main()
 		params.startupParams.calcMod = USE_RANDOMPOS_RANDOMSIZE;
 		params.startupParams.mat = MEM_ACCESS_TYPE::full;
 
-		size_t threadCountMax = 23;
+		size_t threadCountMax = 1;
 
 		for ( params.startupParams.threadCount=1; params.startupParams.threadCount<=threadCountMax; ++(params.startupParams.threadCount) )
 		{

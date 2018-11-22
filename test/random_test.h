@@ -299,7 +299,14 @@ public:
 	}
 
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
-	void* allocate( size_t sz ) { void* ret = g_AllocManager.zombieableAllocate( sz ); return ret; }
+	void* allocate( size_t sz ) { 
+		void* ret = g_AllocManager.zombieableAllocate( sz ); 
+		assert(g_AllocManager.isZombieablePointerInBlock(ret, ret)); 
+		assert(!g_AllocManager.isZombieablePointerInBlock(ret, nullptr)); 
+		assert(sz == 0 || g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz - 1)); 
+		assert(sz < 16 || !g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz*2)); 
+		return ret; 
+	}
 	void deallocate( void* ptr ) { g_AllocManager.zombieableDeallocate( ptr ); }
 #else
 	void* allocate( size_t sz ) { 

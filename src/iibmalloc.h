@@ -1143,6 +1143,8 @@ public:
 	}
 };
 
+#define ENABLE_SAFE_ALLOCATION_MEANS // TODO: consider making project-level
+
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
 
 class SafeIibAllocator : protected IibAllocatorBase
@@ -1171,6 +1173,17 @@ public:
 	FORCE_INLINE void deallocate(void* ptr )
 	{
 		IibAllocatorBase::deallocate( ptr );
+	}
+
+	FORCE_INLINE size_t isPointerInBlock(void* allocatedPtr, void* ptr )
+	{
+		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( ptr );
+	}
+
+	FORCE_INLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
+	{
+		void* trueAllocatedPtr = reinterpret_cast<void**>(allocatedPtr) - 1;
+		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
 	}
 
 	FORCE_INLINE void* zombieableAllocate(size_t sz)

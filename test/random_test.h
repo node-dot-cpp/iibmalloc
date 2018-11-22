@@ -302,14 +302,18 @@ public:
 	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
 	void deinit()
 	{
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
+#endif
 		g_AllocManager.deinitialize();
 		g_AllocManager.disable();
 	}
 
 	void doWhateverAfterSetupPhase()
 	{
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
+#endif
 		testRes->rdtscSetup = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().sysAllocCount;
@@ -321,12 +325,16 @@ public:
 
 	void doWhateverWithinMainLoopPhase()
 	{
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
+#endif
 	}
 
 	void doWhateverAfterMainLoopPhase()
 	{
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
+#endif
 		testRes->rdtscMainLoop = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().sysAllocCount;
@@ -338,7 +346,9 @@ public:
 
 	void doWhateverAfterCleanupPhase()
 	{
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
+#endif
 		testRes->rdtscExit = __rdtsc();
 		testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().sysAllocCount;

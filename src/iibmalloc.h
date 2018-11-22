@@ -1099,6 +1099,7 @@ public:
 	}
 };
 
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
 
 class SafeIibAllocator : protected IibAllocatorBase
 {
@@ -1217,9 +1218,15 @@ public:
 	}
 };
 
+#endif // ENABLE_SAFE_ALLOCATION_MEANS
 
-//typedef IibAllocatorBase ThreadLocalAllocatorT;
+
+#ifndef ENABLE_SAFE_ALLOCATION_MEANS
+typedef IibAllocatorBase ThreadLocalAllocatorT;
+#else
 typedef SafeIibAllocator ThreadLocalAllocatorT;
+#endif // ENABLE_SAFE_ALLOCATION_MEANS
+
 extern thread_local ThreadLocalAllocatorT g_AllocManager;
 
 

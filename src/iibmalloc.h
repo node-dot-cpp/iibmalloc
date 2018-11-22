@@ -734,6 +734,21 @@ public:
 
 	}
 
+	size_t getAllocatedSize( void* ptr )
+	{
+		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
+		if ( h->getPageCount() != 0 )
+		{
+			assert( h->getPageCount() <= max_pages );
+			return h->getPageCount() << PAGE_SIZE_EXP;
+		}
+		else
+		{
+			return (size_t)(h->prevInBlock());
+		}
+
+	}
+
 	void deinitialize()
 	{
 		class F { private: BasePageAllocator* alloc; public: F(BasePageAllocator*alloc_) {alloc = alloc_;} void f(AnyChunkHeader* h) {assert( h != nullptr ); alloc->freeChunkNoCache( h, commited_block_size ); } }; F f(this);
@@ -1066,6 +1081,35 @@ public:
 				bulkAllocator.deallocate( pageStart );
 			}
 		}
+	}
+
+	FORCE_INLINE size_t getAllocatedSize(void* ptr)
+	{
+		if(ptr)
+		{
+			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
+			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
+			if ( offsetInPage != memForbidden )
+			{
+				size_t idx = PageAllocatorT::addressToIdx( ptr );
+#ifdef USE_EXP_BUCKET_SIZES
+				return indexToBucketSize(idx);
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+				return indexToBucketSizeHalfExp(idx);
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+				return indexToBucketSizeQuarterExp(idx);
+#else
+#error Undefined bucket size schema
+#endif
+			}
+			else
+			{
+				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
+				return bulkAllocator.getAllocatedSize( pageStart );
+			}
+		}
+		else
+			return 0;
 	}
 	
 	const BlockStats& getStats() const { return pageAllocator.getStats(); }

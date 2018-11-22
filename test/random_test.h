@@ -298,8 +298,18 @@ public:
 		g_AllocManager.enable();
 	}
 
-	void* allocate( size_t sz ) { return g_AllocManager.allocate( sz ); }
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+	void* allocate( size_t sz ) { void* ret = g_AllocManager.allocate( sz ); return ret; }
 	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+#else
+	void* allocate( size_t sz ) { 
+		void* ret = g_AllocManager.allocate( sz ); 
+		assert(g_AllocManager.getAllocatedSize(ret) >= sz); 
+		assert(sz < 8 || g_AllocManager.getAllocatedSize(ret) <= sz*2); 
+		return ret; 
+	}
+	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+#endif
 	void deinit()
 	{
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS

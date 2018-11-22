@@ -1163,23 +1163,23 @@ public:
 	void disable() {}
 
 
-	FORCE_INLINE void* uncheckedAlloc(size_t sz)
+	FORCE_INLINE void* allocate(size_t sz)
 	{
 		return IibAllocatorBase::allocate( sz );
 	}
 
-	FORCE_INLINE void uncheckedDelloc(void* ptr )
+	FORCE_INLINE void deallocate(void* ptr )
 	{
 		IibAllocatorBase::deallocate( ptr );
 	}
 
-	FORCE_INLINE void* allocate(size_t sz)
+	FORCE_INLINE void* zombieableAllocate(size_t sz)
 	{
 		void* ret = IibAllocatorBase::allocate( sz + sizeof(void*) );
 		return reinterpret_cast<void**>(ret) + 1;
 	}
 
-	FORCE_INLINE void deallocate(void* userPtr)
+	FORCE_INLINE void zombieableDeallocate(void* userPtr)
 	{
 		void* ptr = reinterpret_cast<void**>(userPtr) - 1;
 		if(ptr)

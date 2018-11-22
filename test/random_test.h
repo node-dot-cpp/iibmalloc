@@ -299,8 +299,8 @@ public:
 	}
 
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
-	void* allocate( size_t sz ) { void* ret = g_AllocManager.allocate( sz ); return ret; }
-	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+	void* allocate( size_t sz ) { void* ret = g_AllocManager.zombieableAllocate( sz ); return ret; }
+	void deallocate( void* ptr ) { g_AllocManager.zombieableDeallocate( ptr ); }
 #else
 	void* allocate( size_t sz ) { 
 		void* ret = g_AllocManager.allocate( sz ); 

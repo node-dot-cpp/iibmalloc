@@ -52,7 +52,7 @@
 
 #include "test_common.h"
 //#include "bucket_allocator.h"
-#include "../iibmalloc/iibmalloc.h"
+#include "../src/iibmalloc.h"
 
 
 extern thread_local unsigned long long rnd_seed;

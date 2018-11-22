@@ -12,38 +12,45 @@
     <Filter Include="linux-staff-for-quick-editing">
       <UniqueIdentifier>{3d2a025c-1acb-41fd-8a32-dfb0099569cb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{2f8f4442-30d7-40e9-9f89-02e93fac90cb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\iibmalloc\iibmalloc.h">
+    <ClInclude Include="..\..\src\iibmalloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\iibmalloc\iibmalloc_common.h">
+    <ClInclude Include="..\..\src\iibmalloc_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\iibmalloc\iibmalloc_page_allocator.h">
+    <ClInclude Include="..\..\src\iibmalloc_page_allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\other_staff\random_test.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\random_test.h">
+      <Filter>test</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\other_staff\test_common.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\test_common.h">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\iibmalloc\page_allocator_windows.cpp">
+    <ClCompile Include="..\..\src\iibmalloc_windows.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\iibmalloc\page_allocator_linux.cpp">
-      <Filter>linux-staff-for-quick-editing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\iibmalloc\iibmalloc_linux.cpp">
-      <Filter>linux-staff-for-quick-editing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\iibmalloc\iibmalloc_windows.cpp">
+    <ClCompile Include="..\..\src\page_allocator_windows.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\other_staff\random_test.cpp" />
-    <ClCompile Include="..\src\other_staff\test_common.cpp" />
+    <ClCompile Include="..\..\src\iibmalloc_linux.cpp">
+      <Filter>linux-staff-for-quick-editing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\page_allocator_linux.cpp">
+      <Filter>linux-staff-for-quick-editing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\random_test.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\test_common.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

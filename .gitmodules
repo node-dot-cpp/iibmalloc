@@ -1,0 +1,3 @@
+[submodule "src/foundation"]
+	path = src/foundation
+	url = https://github.com/node-dot-cpp/nodecpp-foundation

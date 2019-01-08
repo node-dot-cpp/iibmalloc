@@ -241,7 +241,7 @@ public:
 public:
 	SoundingAddressPageAllocator() {}
 
-	static FORCE_INLINE size_t addressToIdx( void* ptr ) 
+	static NODECPP_FORCEINLINE size_t addressToIdx( void* ptr ) 
 	{ 
 		// TODO: make sure computations are optimal
 		uintptr_t padr = (uintptr_t)(ptr) >> PAGE_SIZE_EXP;
@@ -249,7 +249,7 @@ public:
 		uintptr_t meaningfulBits = padr & meaningfulBitsMask;
 		return meaningfulBits >> pages_per_bucket_exp;
 	}
-	static FORCE_INLINE void* idxToPageAddr( void* blockptr, size_t idx, size_t pagesUsed ) 
+	static NODECPP_FORCEINLINE void* idxToPageAddr( void* blockptr, size_t idx, size_t pagesUsed ) 
 	{ 
 		assert( idx < bucket_cnt );
 		uintptr_t startAsIdx = addressToIdx( blockptr );
@@ -264,8 +264,8 @@ public:
 		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
 		return (void*)( ret );
 	}
-	static FORCE_INLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
-	static FORCE_INLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
+	static NODECPP_FORCEINLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
+	static NODECPP_FORCEINLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
 
 	void initialize( uint8_t blockSizeExp )
 	{
@@ -792,20 +792,20 @@ protected:
 public:
 #ifdef USE_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		return 1ULL << (ix + 3);
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		size_t ret = ( 1ULL << ((ix>>1) + 3) ) + ( ( ( ( ix + 1 ) & 1 ) - 1 ) & ( 1ULL << ((ix>>1) + 2) ) );
 		return alignUpExp( ret, 3 ); // this is because of case ix = 1, ret = 12 (keeping 8-byte alignment)
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSizeQuarterExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeQuarterExp(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		ix += 3;
 		size_t ret = ( 4ULL << ((ix>>2)) ) + ((ix&3)+1) * (1ULL << ((ix>>2)));
@@ -820,7 +820,7 @@ public:
 #if defined(_M_IX86)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint32_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
 	{
 		unsigned long ix;
 		uint8_t r = _BitScanReverse(&ix, sz - 1);
@@ -836,7 +836,7 @@ public:
 #elif defined(_M_X64)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndex(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
 	{
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz - 1);
@@ -844,7 +844,7 @@ public:
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -858,7 +858,7 @@ public:
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -881,7 +881,7 @@ public:
 #if defined(__i386__)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint32_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
 	{
 		uint32_t ix = __builtin_clzl(sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(29ul - ix);
@@ -896,14 +896,14 @@ public:
 #elif defined(__x86_64__)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
 	{
 		uint64_t ix = __builtin_clzll(sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -919,7 +919,7 @@ public:
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -1004,7 +1004,7 @@ public:
 		}
 	}
 
-	NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
+	NODECPP_NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
 	{
 #ifdef USE_EXP_BUCKET_SIZES
 		size_t bucketSz = indexToBucketSize( szidx );
@@ -1026,7 +1026,7 @@ public:
 		return ret;
 	}
 
-	NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
+	NODECPP_NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
 	{
 		constexpr size_t memStart = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 		void* block = bulkAllocator.allocate( sz + memStart );
@@ -1034,7 +1034,7 @@ public:
 		return reinterpret_cast<uint8_t*>(block) + memStart;
 	}
 
-	FORCE_INLINE void* allocate(size_t sz)
+	NODECPP_FORCEINLINE void* allocate(size_t sz)
 	{
 		if ( sz <= MaxBucketSize )
 		{
@@ -1063,7 +1063,7 @@ public:
 		return nullptr;
 	}
 
-	FORCE_INLINE void deallocate(void* ptr)
+	NODECPP_FORCEINLINE void deallocate(void* ptr)
 	{
 		if(ptr)
 		{
@@ -1083,7 +1083,7 @@ public:
 		}
 	}
 
-	FORCE_INLINE size_t getAllocatedSize(void* ptr)
+	NODECPP_FORCEINLINE size_t getAllocatedSize(void* ptr)
 	{
 		if(ptr)
 		{
@@ -1168,28 +1168,28 @@ public:
 	void disable() {}
 
 
-	FORCE_INLINE void* allocate(size_t sz)
+	NODECPP_FORCEINLINE void* allocate(size_t sz)
 	{
 		return IibAllocatorBase::allocate( sz );
 	}
 
-	FORCE_INLINE void deallocate(void* ptr )
+	NODECPP_FORCEINLINE void deallocate(void* ptr )
 	{
 		IibAllocatorBase::deallocate( ptr );
 	}
 
-	FORCE_INLINE size_t isPointerInBlock(void* allocatedPtr, void* ptr )
+	NODECPP_FORCEINLINE size_t isPointerInBlock(void* allocatedPtr, void* ptr )
 	{
 		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( ptr );
 	}
 
-	FORCE_INLINE void* zombieableAllocate(size_t sz)
+	NODECPP_FORCEINLINE void* zombieableAllocate(size_t sz)
 	{
 		void* ret = IibAllocatorBase::allocate( sz + guaranteed_prefix_size );
 		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
 	}
 
-	FORCE_INLINE void zombieableDeallocate(void* userPtr)
+	NODECPP_FORCEINLINE void zombieableDeallocate(void* userPtr)
 	{
 		//void* ptr = reinterpret_cast<void**>(userPtr) - 1;
 		void* ptr = reinterpret_cast<uint8_t*>(userPtr) - guaranteed_prefix_size;
@@ -1222,13 +1222,13 @@ public:
 		}
 	}
 
-	FORCE_INLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
+	NODECPP_FORCEINLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
 	{
 		void* trueAllocatedPtr = reinterpret_cast<void**>(allocatedPtr) - 1;
 		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
 	}
 
-	FORCE_INLINE void killAllZombies()
+	NODECPP_FORCEINLINE void killAllZombies()
 	{
 		for ( size_t idx=0; idx<BucketCount; ++idx)
 		{

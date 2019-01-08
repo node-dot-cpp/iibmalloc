@@ -58,7 +58,7 @@
 extern thread_local unsigned long long rnd_seed;
 constexpr size_t max_threads = 32;
 
-FORCE_INLINE unsigned long long rng64(void)
+NODECPP_FORCEINLINE unsigned long long rng64(void)
 {
 	unsigned long long c = 7319936632422683443ULL;
 	unsigned long long x = (rnd_seed += c);
@@ -73,7 +73,7 @@ FORCE_INLINE unsigned long long rng64(void)
 	return x;
 }
 
-FORCE_INLINE uint32_t xorshift32( uint32_t x )
+NODECPP_FORCEINLINE uint32_t xorshift32( uint32_t x )
 {
 	/* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
 	x ^= x << 13;
@@ -82,7 +82,7 @@ FORCE_INLINE uint32_t xorshift32( uint32_t x )
 	return x;
 }
 
-FORCE_INLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t maxSizeExp )
+NODECPP_FORCEINLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t maxSizeExp )
 {
 	assert( maxSizeExp >= 3 );
 	maxSizeExp -= 3;
@@ -426,7 +426,7 @@ struct Pareto_80_20_6_Data
 	uint32_t offsets[8];
 };
 
-FORCE_INLINE
+NODECPP_FORCEINLINE
 void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 {
 	data.probabilityRanges[0] = (uint32_t)(UINT32_MAX * Pareto_80_20_6[0]);
@@ -439,7 +439,7 @@ void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 		data.offsets[i+1] = data.offsets[i] + (uint32_t)(itemCount * Pareto_80_20_6[6-i]);
 }
 
-FORCE_INLINE
+NODECPP_FORCEINLINE
 size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uint32_t rnum2 )
 {
 	size_t idx = 6;

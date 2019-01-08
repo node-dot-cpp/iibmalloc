@@ -38,24 +38,25 @@
 #include <cstddef>
 #include <cinttypes>
 #include <memory>
-#include <cassert>
+//#include <cassert>
 #include <array>
 
+#include <foundation.h>
 
 // FUNCTION INLINING, etc
 
 #if _MSC_VER
 #include <intrin.h>
 #define ALIGN(n)      __declspec(align(n))
-#define NOINLINE      __declspec(noinline)
-#define FORCE_INLINE	__forceinline
+//#define NOINLINE      __declspec(noinline)
+//#define FORCE_INLINE	__forceinline
 #elif __GNUC__
 #define ALIGN(n)      __attribute__ ((aligned(n))) 
-#define NOINLINE      __attribute__ ((noinline))
-#define	FORCE_INLINE inline __attribute__((always_inline))
+//#define NOINLINE      __attribute__ ((noinline))
+//#define	FORCE_INLINE inline __attribute__((always_inline))
 #else
-#define	FORCE_INLINE inline
-#define NOINLINE
+//#define	FORCE_INLINE inline
+//#define NOINLINE
 //#define ALIGN(n)
 #warning ALIGN, FORCE_INLINE and NOINLINE may not be properly defined
 #endif
@@ -77,14 +78,14 @@ uint8_t sizeToExpImpl<0>(size_t sz)
 	return 0; // error?
 }
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 uint8_t sizeToExp(size_t sz)
 {
 	// keep it reasonable!
 	return sizeToExpImpl<32>(sz);
 }
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 size_t expToSize(uint8_t exp)
 {
 	return static_cast<size_t>(1) << exp;
@@ -92,7 +93,7 @@ size_t expToSize(uint8_t exp)
 
 static_assert(sizeToExp(64 * 1024) == 16, "broken!");
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 size_t expToMask(size_t sz)
 {
 	// keep it reasonable!
@@ -100,13 +101,13 @@ size_t expToMask(size_t sz)
 }
 
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 bool isAlignedMask(uintptr_t sz, uintptr_t alignmentMask)
 {
 	return (sz & alignmentMask) == 0;
 }
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 uintptr_t alignDownExp(uintptr_t sz, uintptr_t alignmentExp)
 {
 	return ( sz >> alignmentExp ) << alignmentExp;
@@ -118,7 +119,7 @@ bool isAlignedExp(uintptr_t sz, uintptr_t alignment)
 	return alignDownExp(sz, alignment) == sz;
 }
 
-FORCE_INLINE constexpr
+NODECPP_FORCEINLINE constexpr
 uintptr_t alignUpMask(uintptr_t sz, uintptr_t alignmentMask)
 {
 	return (( sz & alignmentMask) == 0) ? sz : sz - (sz & alignmentMask) + alignmentMask + 1;

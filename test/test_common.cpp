@@ -66,7 +66,7 @@ int64_t GetMicrosecondCount()
 
 
 
-NOINLINE
+NODECPP_NOINLINE
 size_t GetMillisecondCount()
 {
     size_t now;

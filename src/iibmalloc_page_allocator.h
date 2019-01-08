@@ -163,28 +163,28 @@ public:
 		lst.listInitializeEmpty();
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	bool empty() const { return count == 0; }
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		uint32_t size() const { return count; }
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		bool isEnd(MemoryBlockListItem* item) const { return item == &lst; }
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	MemoryBlockListItem* front()
 
 	{
 		return lst.listGetNext();
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	void pushFront(MemoryBlockListItem* chk)
 	{
 		lst.listInsertNext(chk);
 		++count;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	MemoryBlockListItem* popFront()
 	{
 		assert(!empty());
@@ -196,7 +196,7 @@ public:
 		return chk;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		MemoryBlockListItem* popBack()
 	{
 		assert(!empty());
@@ -208,7 +208,7 @@ public:
 		return chk;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	void remove(MemoryBlockListItem* chk)
 	{
 		chk->removeFromList();

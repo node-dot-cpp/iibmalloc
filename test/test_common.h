@@ -37,7 +37,9 @@
 
 #include <cstdint>
 #include <stdlib.h>
-/*#include <assert.h>
+#include <foundation.h>
+
+ /*#include <assert.h>
 
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -46,11 +48,11 @@
 #endif*/
 
 #if _MSC_VER
-#define NOINLINE      __declspec(noinline)
+//#define NOINLINE      __declspec(noinline)
 #elif __GNUC__
-#define NOINLINE      __attribute__ ((noinline))
+//#define NOINLINE      __attribute__ ((noinline))
 #else
-#define NOINLINE
+//#define NOINLINE
 #endif
 
 int64_t GetMicrosecondCount();

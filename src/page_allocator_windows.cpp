@@ -44,6 +44,7 @@
 
 //thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
 
+#if 0
 template< typename... ARGS >
 void allocLog(const char* formatStr, const ARGS&... args)
 {
@@ -121,6 +122,7 @@ void VirtualMemory::decommit(uintptr_t addr, size_t size)
 	BOOL r = VirtualFree(reinterpret_cast<void*>(addr), size, MEM_DECOMMIT);
 	assert(r);
 }
+#endif // 0
 
 void* VirtualMemory::allocate(size_t size)
 {

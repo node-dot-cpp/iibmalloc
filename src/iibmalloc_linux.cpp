@@ -53,7 +53,7 @@ namespace nodecpp::iibmalloc
 
 using namespace nodecpp::iibmalloc;
 
-
+#if 0
 void* operator new(std::size_t count)
 {
 	return g_AllocManager.allocate(count);
@@ -73,7 +73,7 @@ void operator delete[](void* ptr) noexcept
 {
 	g_AllocManager.deallocate(ptr);
 }
-
+#endif // 0
 #if __cplusplus >= 201703L
 
 //We don't support alignment new/delete yet

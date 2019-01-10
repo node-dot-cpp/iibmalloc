@@ -48,10 +48,13 @@ namespace nodecpp::iibmalloc
 }
 
 using namespace nodecpp::iibmalloc;
-
+#if 0
 void* operator new(std::size_t count)
 {
-	return g_AllocManager.allocate(count);
+	void* ret = g_AllocManager.allocate(count);
+	if ( ((uintptr_t)ret & 0x3ffff) == 0 )
+		return ret;
+	return ret;
 /*	void * ret = g_AllocManager.allocate(count);
 	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "operator new is called with size = {}; ptr = 0x{:x}", count, (size_t)ret );
 	return ret;*/
@@ -72,6 +75,7 @@ void operator delete[](void* ptr) noexcept
 {
 	g_AllocManager.deallocate(ptr);
 }
+#endif // 0
 
 #if __cplusplus >= 201703L
 

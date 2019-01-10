@@ -530,6 +530,7 @@ private:
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, (szTotal << PAGE_SIZE_EXP) == commited_block_size );
 	}
 
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 	void dbgValidateAllBlocks()
 	{
 		class F { private: BulkAllocator<BasePageAllocator, commited_block_size, max_pages>* me; public: F(BulkAllocator<BasePageAllocator, commited_block_size, max_pages>*me_) {me = me_;} void f(AnyChunkHeader* h) {NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, blockList[i] != nullptr ); me->dbgValidateBlock( h ); } }; F f(this);
@@ -540,6 +541,7 @@ private:
 			dbgValidateBlock( start );
 		}*/
 	}
+#endif
 
 	void dbgValidateFreeList( const FreeChunkHeader* h, const uint16_t pageCnt )
 	{

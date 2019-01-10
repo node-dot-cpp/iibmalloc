@@ -46,7 +46,12 @@
 #include <fcntl.h>
 
 
-thread_local ThreadLocalAllocatorT g_AllocManager;
+namespace nodecpp::iibmalloc
+{
+	thread_local ThreadLocalAllocatorT g_AllocManager;
+}
+
+using namespace nodecpp::iibmalloc;
 
 
 void* operator new(std::size_t count)

@@ -52,5 +52,7 @@
     <ClCompile Include="..\test_common.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\foundation\3rdparty\fmt\src\format.cc" />
+    <ClCompile Include="..\..\src\foundation\src\log.cpp" />
   </ItemGroup>
 </Project>

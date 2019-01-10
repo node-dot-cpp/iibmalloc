@@ -26,6 +26,8 @@
     <ClInclude Include="..\test_common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\foundation\3rdparty\fmt\src\format.cc" />
+    <ClCompile Include="..\..\src\foundation\src\log.cpp" />
     <ClCompile Include="..\..\src\iibmalloc_linux.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -96,19 +98,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\3rdparty\fmt\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src\foundation\include;E:\CURRENT\OLOGN_PROJECTS\NODE-DOT-CPP\iibmalloc\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

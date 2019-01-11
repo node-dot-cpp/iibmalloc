@@ -33,6 +33,8 @@
 #ifndef ALLOCATOR_RANDOM_TEST_H
 #define ALLOCATOR_RANDOM_TEST_H
 
+#include "test_common.h"
+
 #include <stdint.h>
 #define NOMINMAX
 
@@ -45,12 +47,11 @@
 #include <random>
 #include <limits.h>
 
-#ifndef __GNUC__
+#ifdef NODECPP_MSVC
 #include <intrin.h>
 #else
 #endif
 
-#include "test_common.h"
 //#include "bucket_allocator.h"
 #include "../src/iibmalloc.h"
 
@@ -89,10 +90,10 @@ NODECPP_FORCEINLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t
 	uint32_t statClassBase = (randNum & (( 1 << maxSizeExp ) - 1)) + 1; // adding 1 to avoid dealing with 0
 	randNum >>= maxSizeExp;
 	unsigned long idx;
-#if _MSC_VER
+#ifdef NODECPP_MSVC
 	uint8_t r = _BitScanForward(&idx, statClassBase);
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, r );
-#elif __GNUC__
+#elif (defined NODECPP_GCC) || (defined NODECPP_CLANG)
 	idx = __builtin_ctzll( statClassBase );
 #else
 	static_assert(false, "Unknown compiler");

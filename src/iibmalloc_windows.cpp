@@ -52,8 +52,6 @@ using namespace nodecpp::iibmalloc;
 void* operator new(std::size_t count)
 {
 	void* ret = g_AllocManager.allocate(count);
-	if ( ((uintptr_t)ret & 0x3ffff) == 0 )
-		return ret;
 	return ret;
 /*	void * ret = g_AllocManager.allocate(count);
 	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "operator new is called with size = {}; ptr = 0x{:x}", count, (size_t)ret );

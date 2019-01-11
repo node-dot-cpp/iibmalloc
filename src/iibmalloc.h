@@ -815,8 +815,8 @@ public:
 #error "Undefined bucket size schema"
 #endif
 
-#if defined(_MSC_VER)
-#if defined(_M_IX86)
+#if defined NODECPP_MSVC
+#if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
@@ -832,7 +832,7 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined(_M_X64)
+#elif defined NODECPP_X64
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 	NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
@@ -876,8 +876,8 @@ public:
 #error Unknown 32/64 bits architecture
 #endif
 
-#elif defined(__GNUC__)
-#if defined(__i386__)
+#elif (defined NODECPP_CLANG) || (defined NODECPP_GCC)
+#if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
@@ -892,7 +892,7 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined(__x86_64__)
+#elif defined NODECPP_X64
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)

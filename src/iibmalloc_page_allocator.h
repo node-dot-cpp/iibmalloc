@@ -48,7 +48,7 @@ namespace nodecpp::iibmalloc
 #define GET_PERF_DATA
 
 #ifdef GET_PERF_DATA
-#ifdef _MSC_VER
+#ifdef NODECPP_MSVC
 #include <intrin.h>
 #else
 #include <x86intrin.h>

@@ -37,7 +37,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-#ifdef _MSC_VER
+#ifdef NODECPP_MSVC
 #include <Windows.h>
 #else
 #include <time.h>
@@ -47,7 +47,7 @@
 int64_t GetMicrosecondCount()
 {
 	int64_t now = 0;
-#ifdef _MSC_VER
+#ifdef NODECPP_MSVC
 	static int64_t frec = 0;
 	if (frec == 0)
 	{
@@ -70,7 +70,7 @@ NODECPP_NOINLINE
 size_t GetMillisecondCount()
 {
     size_t now;
-#ifdef _MSC_VER
+#ifdef NODECPP_MSVC
 	static uint64_t frec = 0;
 	if (frec == 0)
 	{

@@ -1,7 +1,7 @@
-/* -------------------------------------------------------------------------------
+ /* -------------------------------------------------------------------------------
  * Copyright (c) 2018, OLogN Technologies AG
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -9,14 +9,14 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the <organization> nor the
+ *     * Neither the name of the OLogN Technologies AG nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ * DISCLAIMED. IN NO EVENT SHALL OLogN Technologies AG BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
@@ -33,6 +33,8 @@
 #ifndef ALLOCATOR_RANDOM_TEST_H
 #define ALLOCATOR_RANDOM_TEST_H
 
+#include "test_common.h"
+
 #include <stdint.h>
 #define NOMINMAX
 
@@ -45,12 +47,11 @@
 #include <random>
 #include <limits.h>
 
-#ifndef __GNUC__
+#ifdef NODECPP_MSVC
 #include <intrin.h>
 #else
 #endif
 
-#include "test_common.h"
 //#include "bucket_allocator.h"
 #include "../src/iibmalloc.h"
 
@@ -58,7 +59,7 @@
 extern thread_local unsigned long long rnd_seed;
 constexpr size_t max_threads = 32;
 
-FORCE_INLINE unsigned long long rng64(void)
+NODECPP_FORCEINLINE unsigned long long rng64(void)
 {
 	unsigned long long c = 7319936632422683443ULL;
 	unsigned long long x = (rnd_seed += c);
@@ -73,7 +74,7 @@ FORCE_INLINE unsigned long long rng64(void)
 	return x;
 }
 
-FORCE_INLINE uint32_t xorshift32( uint32_t x )
+NODECPP_FORCEINLINE uint32_t xorshift32( uint32_t x )
 {
 	/* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
 	x ^= x << 13;
@@ -82,23 +83,23 @@ FORCE_INLINE uint32_t xorshift32( uint32_t x )
 	return x;
 }
 
-FORCE_INLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t maxSizeExp )
+NODECPP_FORCEINLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t maxSizeExp )
 {
-	assert( maxSizeExp >= 3 );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, maxSizeExp >= 3 );
 	maxSizeExp -= 3;
 	uint32_t statClassBase = (randNum & (( 1 << maxSizeExp ) - 1)) + 1; // adding 1 to avoid dealing with 0
 	randNum >>= maxSizeExp;
 	unsigned long idx;
-#if _MSC_VER
+#ifdef NODECPP_MSVC
 	uint8_t r = _BitScanForward(&idx, statClassBase);
-	assert( r );
-#elif __GNUC__
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, r );
+#elif (defined NODECPP_GCC) || (defined NODECPP_CLANG)
 	idx = __builtin_ctzll( statClassBase );
 #else
 	static_assert(false, "Unknown compiler");
 #endif
-//	assert( idx <= maxSizeExp - 3 );
-	assert( idx <= maxSizeExp );
+//	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx <= maxSizeExp - 3 );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx <= maxSizeExp );
 	idx += 2;
 	size_t szMask = ( 1 << idx ) - 1;
 	return (randNum & szMask) + 1 + (((size_t)1)<<idx);
@@ -115,8 +116,8 @@ inline void testDistribution()
 	for (size_t i=0;i<testCnt;++i)
 	{
 		size_t val = calcSizeWithStatsAdjustment( rng64(), exp );
-//		assert( val <= (((size_t)1)<<exp) );
-		assert( val );
+//		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, val <= (((size_t)1)<<exp) );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, val );
 		if ( val <=8 )
 			bins[3] +=1;
 		else
@@ -124,14 +125,14 @@ inline void testDistribution()
 				if ( val <= (((size_t)1)<<j) && val > (((size_t)1)<<(j-1) ) )
 					bins[j] += 1;
 	}
-	printf( "<=3: %zd\n", bins[0] + bins[1] + bins[2] + bins[3] );
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "<=3: {}", bins[0] + bins[1] + bins[2] + bins[3] );
 	total = 0;
 	for ( size_t j=0; j<=exp; ++j )
 	{
 		total += bins[j];
-		printf( "%zd: %zd\n", j, bins[j] );
+		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}: {}", j, bins[j] );
 	}
-	assert( total == testCnt );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, total == testCnt );
 }
 
 enum { TRY_ALL = 0xFFFFFFFF, USE_EMPTY_TEST = 0x1, USE_PER_THREAD_ALLOCATOR = 0x2, USE_NEW_DELETE = 0x4, };
@@ -178,21 +179,21 @@ struct ThreadTestRes : public CommonTestResults
 void printThreadStats( const char* prefix, ThreadTestRes& res )
 {
 	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
-//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
-	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 }
 
 void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 {
 	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
-//	printf( "%s%zd: %zdms; %zd (%zd | %zd | %zd);\n", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
-	printf( "%s%zd: %zdms; %zd (%.2f | %.2f | %.2f);\n", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 
 	size_t mainLoopAllocCnt = res.sysAllocCallCntAfterMainLoop - res.sysAllocCallCntAfterSetup;
 	uint64_t mainLoopAllocCntRdtsc = res.rdtscSysAllocCallSumAfterMainLoop - res.rdtscSysAllocCallSumAfterSetup;
 	size_t exitAllocCnt = res.sysAllocCallCntAfterExit - res.sysAllocCallCntAfterMainLoop;
 	uint64_t exitAllocCntRdtsc = res.rdtscSysAllocCallSumAfterExit - res.rdtscSysAllocCallSumAfterMainLoop;
-	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
 		prefix, 
 		res.allocRequestCountAfterSetup, res.sysAllocCallCntAfterSetup, res.rdtscSysAllocCallSumAfterSetup, res.sysAllocCallCntAfterSetup ? res.rdtscSysAllocCallSumAfterSetup / res.sysAllocCallCntAfterSetup : 0,
 		res.allocRequestCountAfterMainLoop - res.allocRequestCountAfterSetup, mainLoopAllocCnt, mainLoopAllocCntRdtsc, mainLoopAllocCnt ? mainLoopAllocCntRdtsc / mainLoopAllocCnt : 0,
@@ -202,7 +203,7 @@ void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 	uint64_t mainLoopDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterMainLoop - res.rdtscSysDeallocCallSumAfterSetup;
 	size_t exitDeallocCnt = res.sysDeallocCallCntAfterExit - res.sysDeallocCallCntAfterMainLoop;
 	uint64_t exitDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterExit - res.rdtscSysDeallocCallSumAfterMainLoop;
-	printf( "%s\t[%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] [%zd -> %zd, %zd (%zd)] \n", 
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
 		prefix, 
 		res.deallocRequestCountAfterSetup, res.sysDeallocCallCntAfterSetup, res.rdtscSysDeallocCallSumAfterSetup, res.sysDeallocCallCntAfterSetup ? res.rdtscSysDeallocCallSumAfterSetup / res.sysDeallocCallCntAfterSetup : 0,
 		res.deallocRequestCountAfterMainLoop - res.deallocRequestCountAfterSetup, mainLoopDeallocCnt, mainLoopDeallocCntRdtsc, mainLoopDeallocCnt ? mainLoopDeallocCntRdtsc / mainLoopDeallocCnt : 0,
@@ -298,8 +299,25 @@ public:
 		g_AllocManager.enable();
 	}
 
-	void* allocate( size_t sz ) { return g_AllocManager.allocate( sz ); }
+#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+	void* allocate( size_t sz ) { 
+		void* ret = g_AllocManager.zombieableAllocate( sz ); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, g_AllocManager.isZombieablePointerInBlock(ret, ret)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !g_AllocManager.isZombieablePointerInBlock(ret, nullptr)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz == 0 || g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz - 1)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 16 || !g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz*2)); 
+		return ret; 
+	}
+	void deallocate( void* ptr ) { g_AllocManager.zombieableDeallocate( ptr ); }
+#else
+	void* allocate( size_t sz ) { 
+		void* ret = g_AllocManager.allocate( sz ); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, g_AllocManager.getAllocatedSize(ret) >= sz); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 8 || g_AllocManager.getAllocatedSize(ret) <= sz*2); 
+		return ret; 
+	}
 	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+#endif
 	void deinit()
 	{
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
@@ -379,7 +397,7 @@ public:
 		fakeBuffer = new uint8_t [fakeBufferSize];
 	}
 
-	void* allocate( size_t sz ) { assert( sz <= fakeBufferSize ); return fakeBuffer; }
+	void* allocate( size_t sz ) { NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz <= fakeBufferSize ); return fakeBuffer; }
 	void deallocate( void* ptr ) {}
 
 	void deinit() { if ( fakeBuffer ) delete [] fakeBuffer; fakeBuffer = nullptr; }
@@ -409,7 +427,7 @@ struct Pareto_80_20_6_Data
 	uint32_t offsets[8];
 };
 
-FORCE_INLINE
+NODECPP_FORCEINLINE
 void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 {
 	data.probabilityRanges[0] = (uint32_t)(UINT32_MAX * Pareto_80_20_6[0]);
@@ -422,7 +440,7 @@ void Pareto_80_20_6_Init( Pareto_80_20_6_Data& data, uint32_t itemCount )
 		data.offsets[i+1] = data.offsets[i] + (uint32_t)(itemCount * Pareto_80_20_6[6-i]);
 }
 
-FORCE_INLINE
+NODECPP_FORCEINLINE
 size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uint32_t rnum2 )
 {
 	size_t idx = 6;
@@ -449,13 +467,13 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 {
 	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
 	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
-//	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
 	size_t dummyCtr = 0;
 
 	Pareto_80_20_6_Data paretoData;
-	assert( maxItems <= UINT32_MAX );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, maxItems <= UINT32_MAX );
 	Pareto_80_20_6_Init( paretoData, (uint32_t)maxItems );
 
 	size_t start = GetMillisecondCount();
@@ -471,7 +489,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 		baseBuff = reinterpret_cast<TestBin*>( allocatorUnderTest.allocate( maxItems * sizeof(TestBin) ) );
 	else
 		baseBuff = new TestBin [ maxItems ]; // just using standard allocator
-	assert( baseBuff );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, baseBuff );
 	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
 
 	// setup (saturation)
@@ -583,7 +601,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	allocatorUnderTest.deinit();
 	allocatorUnderTest.doWhateverAfterCleanupPhase();
 		
-	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
 }
 #else
 template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
@@ -591,13 +609,13 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 {
 	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
 	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
-//	printf( "rnd_seed = %zd, iterCount = %zd, maxItems = %zd, maxItemSizeExp = %zd\n", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
 	size_t dummyCtr = 0;
 
 	Pareto_80_20_6_Data paretoData;
-	assert( maxItems <= UINT32_MAX );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, maxItems <= UINT32_MAX );
 	Pareto_80_20_6_Init( paretoData, (uint32_t)maxItems );
 
 	size_t start = GetMillisecondCount();
@@ -613,7 +631,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 		baseBuff = reinterpret_cast<TestBin*>( allocatorUnderTest.allocate( maxItems * sizeof(TestBin) ) );
 	else
 		baseBuff = new TestBin [ maxItems ]; // just using standard allocator
-	assert( baseBuff );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, baseBuff );
 	memset( baseBuff, 0, maxItems * sizeof( TestBin ) );
 
 	// setup (saturation)
@@ -723,7 +741,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	allocatorUnderTest.deinit();
 	allocatorUnderTest.doWhateverAfterCleanupPhase();
 		
-	printf( "about to exit thread %zd (%zd operations performed) [ctr = %zd]...\n", threadID, iterCount, dummyCtr );
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
 }
 #endif
 

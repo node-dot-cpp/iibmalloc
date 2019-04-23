@@ -1,7 +1,7 @@
-/* -------------------------------------------------------------------------------
+ /* -------------------------------------------------------------------------------
  * Copyright (c) 2018, OLogN Technologies AG
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -9,14 +9,14 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the <organization> nor the
+ *     * Neither the name of the OLogN Technologies AG nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ * DISCLAIMED. IN NO EVENT SHALL OLogN Technologies AG BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
@@ -35,14 +35,11 @@
 #ifndef IIBMALLOC_H
 #define IIBMALLOC_H
 
-#include <cstdlib>
-#include <cstring>
-#include <limits>
-#include <vector> // potentially, a temporary solution
-
 #include "iibmalloc_common.h"
 #include "iibmalloc_page_allocator.h"
 
+namespace nodecpp::iibmalloc
+{
 
 constexpr size_t ALIGNMENT = 2 * sizeof(uint64_t);
 constexpr uint8_t ALIGNMENT_EXP = sizeToExp(ALIGNMENT);
@@ -100,7 +97,7 @@ public:
 			++pageCnt;
 			ListItem* item = freeList;
 			size_t itemCnt = PAGE_SIZE / sizeof( ListItem );
-			assert( itemCnt != 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, itemCnt != 0 );
 			for ( size_t i=0; i<itemCnt-1; ++i )
 			{
 				item->next = item + 1;
@@ -108,7 +105,7 @@ public:
 			}
 			item->next = nullptr;
 		}
-		assert( freeList != nullptr );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeList != nullptr );
 		ListItem* tmp = head;
 		ListItem* nextFree = freeList->next;
 		head = freeList;
@@ -140,7 +137,7 @@ public:
 			--pageCnt;
 			pageStartHead = tmp;
 		}
-		assert( pageCnt == 0 );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, pageCnt == 0 );
 		head = nullptr;
 		freeList = nullptr;
 	}
@@ -189,11 +186,11 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 
 	void* createNextBlockAndGetPage( size_t reasonIdx )
 	{
-		assert( reasonIdx < bucket_cnt );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reasonIdx < bucket_cnt );
 //		PageBlockDescriptor* pb = new PageBlockDescriptor; // TODO: consider using our own allocator
 		PageBlockDescriptor* pb = pageBlockDescriptors.createNew();
 		pb->blockAddress = getNextBlock();
-//printf( "createNextBlockAndGetPage(): descriptor allocated at 0x%zx; block = 0x%zx\n", (size_t)(pb), (size_t)(pb->blockAddress) );
+//nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "createNextBlockAndGetPage(): descriptor allocated at 0x{:x}; block = 0x{:x}", (size_t)(pb), (size_t)(pb->blockAddress) );
 		memset( pb->nextToUse, 0, sizeof( uint16_t) * bucket_cnt );
 		memset( pb->nextToCommit, 0, sizeof( uint16_t) * bucket_cnt );
 		pb->next = nullptr;
@@ -201,7 +198,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		pageBlockListCurrent = pb;
 //		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx );
 		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx, 0 );
-//	printf("createNextBlockAndGetPage(): before commit, %zd, 0x%zx -> 0x%zx\n", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "createNextBlockAndGetPage(): before commit, {}, 0x{:x} -> 0x{:x}", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
 //		void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
 //		this->CommitMemory( ret, PAGE_SIZE );
 		commitRangeOfPageIndexes( pb->blockAddress, reasonIdx, 0, commit_page_cnt );
@@ -209,7 +206,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		static_assert( commit_page_cnt <= UINT16_MAX, "" );
 		pb->nextToCommit[ reasonIdx ] = (uint16_t)commit_page_cnt;
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
-//	printf("createNextBlockAndGetPage(): after commit 0x%zx\n", (size_t)(ret2) );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "createNextBlockAndGetPage(): after commit 0x{:x}", (size_t)(ret2) );
 		return ret;
 	}
 
@@ -241,7 +238,7 @@ public:
 public:
 	SoundingAddressPageAllocator() {}
 
-	static FORCE_INLINE size_t addressToIdx( void* ptr ) 
+	static NODECPP_FORCEINLINE size_t addressToIdx( void* ptr ) 
 	{ 
 		// TODO: make sure computations are optimal
 		uintptr_t padr = (uintptr_t)(ptr) >> PAGE_SIZE_EXP;
@@ -249,23 +246,23 @@ public:
 		uintptr_t meaningfulBits = padr & meaningfulBitsMask;
 		return meaningfulBits >> pages_per_bucket_exp;
 	}
-	static FORCE_INLINE void* idxToPageAddr( void* blockptr, size_t idx, size_t pagesUsed ) 
+	static NODECPP_FORCEINLINE void* idxToPageAddr( void* blockptr, size_t idx, size_t pagesUsed ) 
 	{ 
-		assert( idx < bucket_cnt );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx < bucket_cnt );
 		uintptr_t startAsIdx = addressToIdx( blockptr );
-		assert( ( (uintptr_t)(blockptr) & PAGE_SIZE_MASK ) == 0 );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(blockptr) & PAGE_SIZE_MASK ) == 0 );
 		uintptr_t startingPage =  (uintptr_t)(blockptr) >> PAGE_SIZE_EXP;
 		uintptr_t basePage =  ( startingPage >> (reservation_size_exp - PAGE_SIZE_EXP) ) << (reservation_size_exp - PAGE_SIZE_EXP);
 		uintptr_t baseOffset = startingPage - basePage;
 		bool below = (idx << pages_per_bucket_exp) + pagesUsed < baseOffset;
 		uintptr_t ret = basePage + (idx << pages_per_bucket_exp) + pagesUsed + (below << (pages_per_bucket_exp + bucket_cnt_exp));
 		ret <<= PAGE_SIZE_EXP;
-		assert( addressToIdx( (void*)( ret ) ) == idx );
-		assert( (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, addressToIdx( (void*)( ret ) ) == idx );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, (uint8_t*)blockptr <= (uint8_t*)ret && (uint8_t*)ret < (uint8_t*)blockptr + reservation_size );
 		return (void*)( ret );
 	}
-	static FORCE_INLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
-	static FORCE_INLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
+	static NODECPP_FORCEINLINE size_t getOffsetInPage( void * ptr ) { return (uintptr_t)(ptr) & PAGE_SIZE_MASK; }
+	static NODECPP_FORCEINLINE void* ptrToPageStart( void * ptr ) { return (void*)( ( (uintptr_t)(ptr) >> PAGE_SIZE_EXP ) << PAGE_SIZE_EXP ); }
 
 	void initialize( uint8_t blockSizeExp )
 	{
@@ -299,11 +296,11 @@ public:
 
 	void* getPage( size_t idx )
 	{
-		assert( idx < bucket_cnt );
-		assert( indexHead[idx] );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx < bucket_cnt );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx] );
 		if ( indexHead[idx]->nextToUse[idx] < pages_per_bucket )
 		{
-			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
 			if ( indexHead[idx]->nextToUse[idx] == indexHead[idx]->nextToCommit[idx] )
 			{
 				commitRangeOfPageIndexes( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToCommit[idx], commit_page_cnt );
@@ -311,38 +308,38 @@ public:
 			}
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
 			++(indexHead[idx]->nextToUse[idx]);
-			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
 //			this->CommitMemory( ret, PAGE_SIZE );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
 		else if ( indexHead[idx]->next == nullptr ) // next block is to be created
 		{
-			assert( indexHead[idx] == pageBlockListCurrent );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx] == pageBlockListCurrent );
 			void* ret = createNextBlockAndGetPage( idx );
 			indexHead[idx] = pageBlockListCurrent;
-			assert( indexHead[idx]->next == nullptr );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->next == nullptr );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
 		else // next block is just to be used first time
 		{
 			indexHead[idx] = indexHead[idx]->next;
-			assert( indexHead[idx]->blockAddress );
-//			assert( ( indexHead[idx]->usageMask & ( ((size_t)1) << idx ) ) == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->blockAddress );
+//			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( indexHead[idx]->usageMask & ( ((size_t)1) << idx ) ) == 0 );
 //			indexHead[idx]->usageMask |= ((size_t)1) << idx;
 //			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx );
-			assert( indexHead[idx]->nextToUse[idx] == 0 );
-			assert( indexHead[idx]->nextToCommit[idx] == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToCommit[idx] == 0 );
 			if ( indexHead[idx]->nextToUse[idx] == indexHead[idx]->nextToCommit[idx] )
 			commitRangeOfPageIndexes( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToCommit[idx], commit_page_cnt );
 			indexHead[idx]->nextToCommit[idx] = commit_page_cnt;
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
 			indexHead[idx]->nextToUse[idx] = 1;
-			assert( indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
-//	printf("getPage(): before commit, %zd, 0x%zx -> 0x%zx\n", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "getPage(): before commit, {}, 0x{:x} -> 0x{:x}", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
 //			void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
-//	printf("getPage(): after commit 0x%zx\n", (size_t)(ret2) );
+//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "getPage(): after commit 0x{:x}", (size_t)(ret2) );
 //			this->CommitMemory( ret, PAGE_SIZE );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
@@ -361,7 +358,7 @@ public:
 			mpData.sz1 = PAGE_SIZE;
 			mpData.ptr2 = nullptr;
 			mpData.sz2 = 0;
-			assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 			return;
 		}
 
@@ -371,7 +368,7 @@ public:
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
-			assert( nextPage );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr1) + mpData.sz1 == reinterpret_cast<uint8_t*>(nextPage) )
 				mpData.sz1 += PAGE_SIZE;
 			else break;
@@ -380,7 +377,7 @@ public:
 		{
 			mpData.ptr2 = nullptr;
 			mpData.sz2 = 0;
-			assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 			return;
 		}
 		mpData.ptr2 = nextPage;
@@ -389,18 +386,18 @@ public:
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
-			assert( nextPage );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr2) + mpData.sz2 == reinterpret_cast<uint8_t*>(nextPage) )
 				mpData.sz2 += PAGE_SIZE;
 			else break;
 		}
-		assert( i == multipage_page_cnt );
-		assert( mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, i == multipage_page_cnt );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
 	}
 
 	void freePage( MemoryBlockListItem* chk )
 	{
-		assert( false );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, false );
 		// TODO: decommit
 	}
 
@@ -409,14 +406,14 @@ public:
 		PageBlockDescriptor* next = pageBlockListStart.next;
 		while( next )
 		{
-//printf( "in block 0x%zx about to delete 0x%zx of size 0x%zx\n", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
-			assert( next->blockAddress );
+//nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "in block 0x{:x} about to delete 0x{:x} of size 0x{:x}", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->blockAddress );
 			this->freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), reservation_size );
 			PageBlockDescriptor* tmp = next->next;
 //			delete next;
 			next = tmp;
 		}
-//		class F { private: BasePageAllocator* alloc; public: F(BasePageAllocator*alloc_) {alloc = alloc_;} void f(PageBlockDescriptor& h) {assert( h.blockAddress != nullptr ); alloc->freeChunkNoCache( h.blockAddress, reservation_size ); } }; F f(this);
+//		class F { private: BasePageAllocator* alloc; public: F(BasePageAllocator*alloc_) {alloc = alloc_;} void f(PageBlockDescriptor& h) {NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h.blockAddress != nullptr ); alloc->freeChunkNoCache( h.blockAddress, reservation_size ); } }; F f(this);
 //		pageBlockDescriptors.doForEach(f);
 		pageBlockDescriptors.deinitialize();
 		resetLists();
@@ -446,14 +443,14 @@ public:
 		const AnyChunkHeader* prevInBlock() const {return (const AnyChunkHeader*)( prev & ~((uintptr_t)(PAGE_SIZE_MASK)) ); }
 		AnyChunkHeader* nextInBlock() {return (AnyChunkHeader*)( next & ~((uintptr_t)(PAGE_SIZE_MASK) ) ); }
 		const AnyChunkHeader* nextInBlock() const {return (const AnyChunkHeader*)( next & ~((uintptr_t)(PAGE_SIZE_MASK) ) ); }
-		void setPrevInBlock( AnyChunkHeader* prev_ ) { assert( ((uintptr_t)prev_ & PAGE_SIZE_MASK) == 0 ); prev = ( (uintptr_t)prev_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (prev & ((uintptr_t)(PAGE_SIZE_MASK))); }
+		void setPrevInBlock( AnyChunkHeader* prev_ ) { NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ((uintptr_t)prev_ & PAGE_SIZE_MASK) == 0 ); prev = ( (uintptr_t)prev_ & ~(uintptr_t)(PAGE_SIZE_MASK) ) + (prev & ((uintptr_t)(PAGE_SIZE_MASK))); }
 		uint16_t getPageCount() const { return prev & ((uintptr_t)(PAGE_SIZE_MASK)); }
 		bool isFree() const { return next & ((uintptr_t)(PAGE_SIZE_MASK)); }
 		void set( AnyChunkHeader* prevInBlock_, AnyChunkHeader* nextInBlock_, uint16_t pageCount, bool isFree )
 		{
-			assert( ((uintptr_t)prevInBlock_ & PAGE_SIZE_MASK) == 0 );
-			assert( ((uintptr_t)nextInBlock_ & PAGE_SIZE_MASK) == 0 );
-			assert( pageCount <= (commited_block_size>>PAGE_SIZE_EXP) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ((uintptr_t)prevInBlock_ & PAGE_SIZE_MASK) == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ((uintptr_t)nextInBlock_ & PAGE_SIZE_MASK) == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, pageCount <= (commited_block_size>>PAGE_SIZE_EXP) );
 			prev = ((uintptr_t)prevInBlock_) + pageCount;
 			next = ((uintptr_t)nextInBlock_) + isFree;
 		}
@@ -477,7 +474,7 @@ private:
 	{
 		if ( item->prevFree )
 		{
-			assert( item->getPageCount() == item->prevFree->getPageCount() || ( item->getPageCount() > max_pages && item->prevFree->getPageCount() > max_pages ));
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, item->getPageCount() == item->prevFree->getPageCount() || ( item->getPageCount() > max_pages && item->prevFree->getPageCount() > max_pages ));
 			item->prevFree->nextFree = item->nextFree;
 		}
 		else
@@ -485,21 +482,21 @@ private:
 			uint16_t idx = item->getPageCount() - 1;
 			if ( idx >= max_pages )
 				idx = max_pages;
-			assert( freeListBegin[idx] == item );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[idx] == item );
 			freeListBegin[idx] = item->nextFree;
 			if ( freeListBegin[idx] != nullptr )
 				freeListBegin[idx]->prevFree = nullptr;
 		}
 		if ( item->nextFree )
 		{
-			assert( item->getPageCount() == item->nextFree->getPageCount() || ( item->getPageCount() > max_pages && item->nextFree->getPageCount() > max_pages ));
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, item->getPageCount() == item->nextFree->getPageCount() || ( item->getPageCount() > max_pages && item->nextFree->getPageCount() > max_pages ));
 			item->nextFree->prevFree = item->prevFree;
 		}
 	}
 
 	void dbgValidateBlock( const AnyChunkHeader* h )
 	{
-		assert( h != nullptr );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h != nullptr );
 		size_t szTotal = 0;
 		const AnyChunkHeader* curr = h;
 		while ( curr )
@@ -508,34 +505,35 @@ private:
 			const AnyChunkHeader* next = curr->nextInBlock();
 			if ( next )
 			{
-				assert( next > curr );
-				assert( !(curr->isFree() && next->isFree()) );
-				assert( next->prevInBlock() == curr );
-				assert( reinterpret_cast<const uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( next ) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next > curr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !(curr->isFree() && next->isFree()) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->prevInBlock() == curr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<const uint8_t*>(curr) + (curr->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( next ) );
 			}
 			curr = next;
 		}
 		curr = h->prevInBlock();
-		assert( curr == nullptr || ( curr->isFree() != h->isFree() ) );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, curr == nullptr || ( curr->isFree() != h->isFree() ) );
 		while ( curr )
 		{
 			szTotal += curr->getPageCount();
 			const AnyChunkHeader* prev = curr->prevInBlock();
 			if ( prev )
 			{
-				assert( prev < curr );
-				assert( !(prev->isFree() && curr->isFree()) );
-				assert( prev->nextInBlock() == curr );
-				assert( reinterpret_cast<const uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( curr ) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev < curr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !(prev->isFree() && curr->isFree()) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev->nextInBlock() == curr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<const uint8_t*>(prev) + (prev->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<const uint8_t*>( curr ) );
 			}
 			curr = prev;
 		}
-		assert( (szTotal << PAGE_SIZE_EXP) == commited_block_size );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, (szTotal << PAGE_SIZE_EXP) == commited_block_size );
 	}
 
+#ifdef BULKALLOCATOR_HEAVY_DEBUG
 	void dbgValidateAllBlocks()
 	{
-		class F { private: BulkAllocator<BasePageAllocator, commited_block_size, max_pages>* me; public: F(BulkAllocator<BasePageAllocator, commited_block_size, max_pages>*me_) {me = me_;} void f(AnyChunkHeader* h) {assert( blockList[i] != nullptr ); me->dbgValidateBlock( h ); } }; F f(this);
+		class F { private: BulkAllocator<BasePageAllocator, commited_block_size, max_pages>* me; public: F(BulkAllocator<BasePageAllocator, commited_block_size, max_pages>*me_) {me = me_;} void f(AnyChunkHeader* h) {NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, blockList[i] != nullptr ); me->dbgValidateBlock( h ); } }; F f(this);
 		blocks.doForEachBlock( f );
 /*		for ( size_t i=0; i<blockList.size(); ++i )
 		{
@@ -543,26 +541,27 @@ private:
 			dbgValidateBlock( start );
 		}*/
 	}
+#endif
 
 	void dbgValidateFreeList( const FreeChunkHeader* h, const uint16_t pageCnt )
 	{
-		assert( h != nullptr );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h != nullptr );
 		const FreeChunkHeader* curr = h;
 		while ( curr )
 		{
-			assert( curr->getPageCount() == pageCnt || ( pageCnt > max_pages && curr->getPageCount() >= pageCnt ) );
-			assert( curr->isFree() );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, curr->getPageCount() == pageCnt || ( pageCnt > max_pages && curr->getPageCount() >= pageCnt ) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, curr->isFree() );
 			const FreeChunkHeader* next = curr->nextFree;
-			assert( next == nullptr || next->prevFree == curr );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next == nullptr || next->prevFree == curr );
 			curr = next;
 		}
 		curr = h;
 		while ( curr )
 		{
-			assert( curr->getPageCount() == pageCnt || ( pageCnt > max_pages && curr->getPageCount() >= pageCnt ) );
-			assert( curr->isFree() );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, curr->getPageCount() == pageCnt || ( pageCnt > max_pages && curr->getPageCount() >= pageCnt ) );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, curr->isFree() );
 			const FreeChunkHeader* prev = curr->prevFree;
-			assert( prev == nullptr || prev->nextFree == curr );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev == nullptr || prev->nextFree == curr );
 			curr = prev;
 		}
 	}
@@ -604,15 +603,15 @@ public:
 
 		if ( pageCount <= max_pages )
 		{
-			assert( pageCount <= UINT16_MAX );
-			assert( pageCount <= max_pages );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, pageCount <= UINT16_MAX );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, pageCount <= max_pages );
 
 			if ( freeListBegin[pageCount - 1] == nullptr )
 			{
 				if ( freeListBegin[ max_pages ] == nullptr )
 				{
 					FreeChunkHeader* h = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( commited_block_size ) );
-					assert( h!= nullptr );
+					NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h!= nullptr );
 //					blockList.push_back( h );
 					*(blocks.createNew()) = h;
 					freeListBegin[ max_pages ] = h;
@@ -621,9 +620,9 @@ public:
 					freeListBegin[ max_pages ]->prevFree = nullptr;
 				}
 
-				assert( freeListBegin[ max_pages ] != nullptr );
-				assert( freeListBegin[ max_pages ]->getPageCount() > max_pages );
-				assert( freeListBegin[ max_pages ]->prevFree == nullptr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[ max_pages ] != nullptr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[ max_pages ]->getPageCount() > max_pages );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[ max_pages ]->prevFree == nullptr );
 
 				ret = freeListBegin[ max_pages ];
 				freeListBegin[ max_pages ] = freeListBegin[ max_pages ]->nextFree; // pop
@@ -635,7 +634,7 @@ public:
 				updatedBegin->nextFree = nullptr;
 
 				ret->set( ret->prevInBlock(), updatedBegin, (uint16_t)pageCount, false );
-				assert( freeListBegin[ max_pages ] != updatedBegin );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[ max_pages ] != updatedBegin );
 
 				uint16_t remainingPageCnt = updatedBegin->getPageCount();
 				if ( remainingPageCnt > max_pages )
@@ -655,20 +654,20 @@ public:
 			}
 			else
 			{
-				assert( freeListBegin[pageCount - 1]->nextFree == nullptr || freeListBegin[pageCount - 1]->nextFree->prevFree == freeListBegin[pageCount - 1] );
-				assert( freeListBegin[pageCount - 1]->prevFree == nullptr );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[pageCount - 1]->nextFree == nullptr || freeListBegin[pageCount - 1]->nextFree->prevFree == freeListBegin[pageCount - 1] );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, freeListBegin[pageCount - 1]->prevFree == nullptr );
 				ret = freeListBegin[pageCount - 1];
 				freeListBegin[pageCount - 1] = freeListBegin[pageCount - 1]->nextFree;
 				if ( freeListBegin[pageCount - 1] != nullptr )
 					freeListBegin[pageCount - 1]->prevFree = nullptr;
 			}
-			assert( ret->getPageCount() <= max_pages );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ret->getPageCount() <= max_pages );
 		}
 		else
 		{
 			ret = reinterpret_cast<FreeChunkHeader*>( this->getFreeBlockNoCache( pageCount << PAGE_SIZE_EXP ) );
 			ret->set( (FreeChunkHeader*)(void*)(pageCount<<PAGE_SIZE_EXP), nullptr, 0, false );
-			assert( ret->getPageCount() == 0 );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ret->getPageCount() == 0 );
 		}
 
 
@@ -685,7 +684,7 @@ public:
 		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
 		if ( h->getPageCount() != 0 )
 		{
-			assert( h->getPageCount() <= max_pages );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h->getPageCount() <= max_pages );
 #ifdef BULKALLOCATOR_HEAVY_DEBUG
 		dbgValidateAllBlocks();
 		dbgValidateAllFreeLists();
@@ -694,9 +693,9 @@ public:
 			AnyChunkHeader* prev = h->prevInBlock();
 			if ( prev && prev->isFree() )
 			{
-				assert( prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
-				assert( prev->nextInBlock() == h );
-				assert( reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev->nextInBlock() == h );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
 				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
 				prev->set( prev->prevInBlock(), h->nextInBlock(), prev->getPageCount() + h->getPageCount(), true );
 				h = prev;
@@ -704,9 +703,9 @@ public:
 			AnyChunkHeader* next = h->nextInBlock();
 			if ( next && next->isFree() )
 			{
-				assert( next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
-				assert( next->prevInBlock() == h );
-				assert( reinterpret_cast<uint8_t*>(h) + (h->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( next ) );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->prevInBlock() == h );
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<uint8_t*>(h) + (h->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( next ) );
 				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
 				h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
 			}
@@ -734,14 +733,29 @@ public:
 
 	}
 
+	size_t getAllocatedSize( void* ptr )
+	{
+		AnyChunkHeader* h = reinterpret_cast<AnyChunkHeader*>( ptr );
+		if ( h->getPageCount() != 0 )
+		{
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h->getPageCount() <= max_pages );
+			return h->getPageCount() << PAGE_SIZE_EXP;
+		}
+		else
+		{
+			return (size_t)(h->prevInBlock());
+		}
+
+	}
+
 	void deinitialize()
 	{
-		class F { private: BasePageAllocator* alloc; public: F(BasePageAllocator*alloc_) {alloc = alloc_;} void f(AnyChunkHeader* h) {assert( h != nullptr ); alloc->freeChunkNoCache( h, commited_block_size ); } }; F f(this);
+		class F { private: BasePageAllocator* alloc; public: F(BasePageAllocator*alloc_) {alloc = alloc_;} void f(AnyChunkHeader* h) {NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, h != nullptr ); alloc->freeChunkNoCache( h, commited_block_size ); } }; F f(this);
 		blocks.doForEach(f);
 		blocks.deinitialize();
 /*		for ( size_t i=0; i<blockList.size(); ++i )
 		{
-			assert( blockList[i] != nullptr );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, blockList[i] != nullptr );
 			this->freeChunkNoCache( blockList[i], commited_block_size );
 		}
 		blockList.clear();*/
@@ -777,20 +791,20 @@ protected:
 public:
 #ifdef USE_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		return 1ULL << (ix + 3);
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		size_t ret = ( 1ULL << ((ix>>1) + 3) ) + ( ( ( ( ix + 1 ) & 1 ) - 1 ) & ( 1ULL << ((ix>>1) + 2) ) );
 		return alignUpExp( ret, 3 ); // this is because of case ix = 1, ret = 12 (keeping 8-byte alignment)
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static constexpr
-	FORCE_INLINE size_t indexToBucketSizeQuarterExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeQuarterExp(uint8_t ix) // Note: currently is used once per page formatting
 	{
 		ix += 3;
 		size_t ret = ( 4ULL << ((ix>>2)) ) + ((ix&3)+1) * (1ULL << ((ix>>2)));
@@ -801,11 +815,11 @@ public:
 #error "Undefined bucket size schema"
 #endif
 
-#if defined(_MSC_VER)
-#if defined(_M_IX86)
+#if defined NODECPP_MSVC
+#if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint32_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
 	{
 		unsigned long ix;
 		uint8_t r = _BitScanReverse(&ix, sz - 1);
@@ -818,10 +832,10 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined(_M_X64)
+#elif defined NODECPP_X64
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndex(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
 	{
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz - 1);
@@ -829,28 +843,28 @@ public:
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
 		sz -= 1;
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz);
-//		printf( "ix = %zd\n", ix );
+//		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "ix = {}", ix );
 		uint8_t addition = 1 & ( sz >> (ix-1) );
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
-	FORCE_INLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
+	NODECPP_FORCEINLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
 		sz -= 1;
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz);
-//		printf( "ix = %zd\n", ix );
+//		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "ix = {}", ix );
 		uint8_t addition = 3 & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);
@@ -862,11 +876,11 @@ public:
 #error Unknown 32/64 bits architecture
 #endif
 
-#elif defined(__GNUC__)
-#if defined(__i386__)
+#elif (defined NODECPP_CLANG) || (defined NODECPP_GCC)
+#if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint32_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint32_t sz)
 	{
 		uint32_t ix = __builtin_clzl(sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(29ul - ix);
@@ -878,17 +892,17 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined(__x86_64__)
+#elif defined NODECPP_X64
 #ifdef USE_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndex(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
 	{
 		uint64_t ix = __builtin_clzll(sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -897,14 +911,14 @@ public:
 //		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 		uint64_t ix = __builtin_clzll(sz);
 		ix = 63ull - ix;
-//		printf( "ix = %zd\n", ix );
+//		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "ix = {}", ix );
 		uint8_t addition = 1ull & ( sz >> (ix-1) );
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
-		FORCE_INLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
+		NODECPP_FORCEINLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
 	{
 		if ( sz <= 8 )
 			return 0;
@@ -913,7 +927,7 @@ public:
 //		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 		uint64_t ix = __builtin_clzll(sz);
 		ix = 63ull - ix;
-//		printf( "ix = %zd\n", ix );
+//		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "ix = {}", ix );
 		uint8_t addition = 3ull & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);
@@ -945,8 +959,8 @@ public:
 		constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 		if ( block == nullptr )
 			return false;
-		assert( ( ((uintptr_t)block) & PAGE_SIZE_MASK ) == 0 );
-		assert( ( blockSz & PAGE_SIZE_MASK ) == 0 );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( ((uintptr_t)block) & PAGE_SIZE_MASK ) == 0 );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( blockSz & PAGE_SIZE_MASK ) == 0 );
 		if( ( bucketSz & (memForbidden*2-1) ) == 0 ) // that is, (K * bucketSz) % PAGE_SIZE != memForbidden for any K
 		{
 			size_t itemCnt = blockSz / bucketSz;
@@ -954,7 +968,7 @@ public:
 			{
 				for ( size_t i=0; i<(itemCnt-1)*bucketSz; i+=bucketSz )
 				{
-					assert( ((i + bucketSz) & PAGE_SIZE_MASK) != memForbidden );
+					NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ((i + bucketSz) & PAGE_SIZE_MASK) != memForbidden );
 					*reinterpret_cast<void**>(block + i) = block + i + bucketSz;
 				}
 				*reinterpret_cast<void**>(block + (itemCnt-1)*bucketSz) = nullptr;
@@ -975,7 +989,7 @@ public:
 						*reinterpret_cast<void**>(block + i) = block + i + bucketSz;
 					else
 					{ 
-						assert( i != itemCnt - 2 ); // for small buckets such a bucket could not happen at the end anyway
+						NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, i != itemCnt - 2 ); // for small buckets such a bucket could not happen at the end anyway
 						*reinterpret_cast<void**>(block + i) = block + i + bucketSz + bucketSz;
 						i += bucketSz;
 					}
@@ -989,7 +1003,7 @@ public:
 		}
 	}
 
-	NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
+	NODECPP_NOINLINE void* allocateInCaseNoFreeBucket( size_t sz, uint8_t szidx )
 	{
 #ifdef USE_EXP_BUCKET_SIZES
 		size_t bucketSz = indexToBucketSize( szidx );
@@ -1000,7 +1014,7 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-		assert( bucketSz >= sizeof( void* ) );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, bucketSz >= sizeof( void* ) );
 		PageAllocatorT::MultipageData mpData;
 //		uint8_t* block = reinterpret_cast<uint8_t*>( pageAllocator.getPage( szidx ) );
 		pageAllocator.getMultipage( szidx, mpData );
@@ -1011,7 +1025,7 @@ public:
 		return ret;
 	}
 
-	NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
+	NODECPP_NOINLINE void* allocateInCaseTooLargeForBucket(size_t sz)
 	{
 		constexpr size_t memStart = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 		void* block = bulkAllocator.allocate( sz + memStart );
@@ -1019,7 +1033,7 @@ public:
 		return reinterpret_cast<uint8_t*>(block) + memStart;
 	}
 
-	FORCE_INLINE void* allocate(size_t sz)
+	NODECPP_FORCEINLINE void* allocate(size_t sz)
 	{
 		if ( sz <= MaxBucketSize )
 		{
@@ -1032,7 +1046,7 @@ public:
 #else
 #error Undefined bucket size schema
 #endif
-			assert( szidx < BucketCount );
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, szidx < BucketCount );
 			if ( buckets[szidx] )
 			{
 				void* ret = buckets[szidx];
@@ -1048,7 +1062,7 @@ public:
 		return nullptr;
 	}
 
-	FORCE_INLINE void deallocate(void* ptr)
+	NODECPP_FORCEINLINE void deallocate(void* ptr)
 	{
 		if(ptr)
 		{
@@ -1066,6 +1080,35 @@ public:
 				bulkAllocator.deallocate( pageStart );
 			}
 		}
+	}
+
+	NODECPP_FORCEINLINE size_t getAllocatedSize(void* ptr)
+	{
+		if(ptr)
+		{
+			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
+			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
+			if ( offsetInPage != memForbidden )
+			{
+				size_t idx = PageAllocatorT::addressToIdx( ptr );
+#ifdef USE_EXP_BUCKET_SIZES
+				return indexToBucketSize(idx);
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+				return indexToBucketSizeHalfExp(idx);
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+				return indexToBucketSizeQuarterExp(idx);
+#else
+#error Undefined bucket size schema
+#endif
+			}
+			else
+			{
+				void* pageStart = PageAllocatorT::ptrToPageStart( ptr );
+				return bulkAllocator.getAllocatedSize( pageStart );
+			}
+		}
+		else
+			return 0;
 	}
 	
 	const BlockStats& getStats() const { return pageAllocator.getStats(); }
@@ -1099,10 +1142,15 @@ public:
 	}
 };
 
+#define ENABLE_SAFE_ALLOCATION_MEANS // TODO: consider making project-level
+
 #ifdef ENABLE_SAFE_ALLOCATION_MEANS
+
+constexpr size_t guaranteed_prefix_size = 8;
 
 class SafeIibAllocator : protected IibAllocatorBase
 {
+	static_assert( guaranteed_prefix_size >= sizeof(void*) ); // required to keep zombie list item pointer 'next' inside a block
 protected:
 	void** zombieBucketsFirst[BucketCount];
 	void** zombieBucketsLast[BucketCount];
@@ -1119,25 +1167,31 @@ public:
 	void disable() {}
 
 
-	FORCE_INLINE void* uncheckedAlloc(size_t sz)
+	NODECPP_FORCEINLINE void* allocate(size_t sz)
 	{
 		return IibAllocatorBase::allocate( sz );
 	}
 
-	FORCE_INLINE void uncheckedDelloc(void* ptr )
+	NODECPP_FORCEINLINE void deallocate(void* ptr )
 	{
 		IibAllocatorBase::deallocate( ptr );
 	}
 
-	FORCE_INLINE void* allocate(size_t sz)
+	NODECPP_FORCEINLINE size_t isPointerInBlock(void* allocatedPtr, void* ptr )
 	{
-		void* ret = IibAllocatorBase::allocate( sz + sizeof(void*) );
-		return reinterpret_cast<void**>(ret) + 1;
+		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( ptr );
 	}
 
-	FORCE_INLINE void deallocate(void* userPtr)
+	NODECPP_FORCEINLINE void* zombieableAllocate(size_t sz)
 	{
-		void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		void* ret = IibAllocatorBase::allocate( sz + guaranteed_prefix_size );
+		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
+	}
+
+	NODECPP_FORCEINLINE void zombieableDeallocate(void* userPtr)
+	{
+		//void* ptr = reinterpret_cast<void**>(userPtr) - 1;
+		void* ptr = reinterpret_cast<uint8_t*>(userPtr) - guaranteed_prefix_size;
 		if(ptr)
 		{
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
@@ -1167,7 +1221,13 @@ public:
 		}
 	}
 
-	FORCE_INLINE void killAllZombies()
+	NODECPP_FORCEINLINE size_t isZombieablePointerInBlock(void* allocatedPtr, void* ptr )
+	{
+		void* trueAllocatedPtr = reinterpret_cast<void**>(allocatedPtr) - 1;
+		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
+	}
+
+	NODECPP_FORCEINLINE void killAllZombies()
 	{
 		for ( size_t idx=0; idx<BucketCount; ++idx)
 		{
@@ -1228,6 +1288,8 @@ typedef SafeIibAllocator ThreadLocalAllocatorT;
 #endif // ENABLE_SAFE_ALLOCATION_MEANS
 
 extern thread_local ThreadLocalAllocatorT g_AllocManager;
+
+} // namespace nodecpp::iibmalloc
 
 
 #endif // IIBMALLOC_H

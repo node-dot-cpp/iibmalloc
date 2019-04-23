@@ -1,8 +1,8 @@
 
-/* -------------------------------------------------------------------------------
+ /* -------------------------------------------------------------------------------
  * Copyright (c) 2018, OLogN Technologies AG
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -10,20 +10,20 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the <organization> nor the
+ *     * Neither the name of the OLogN Technologies AG nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ * DISCLAIMED. IN NO EVENT SHALL OLogN Technologies AG BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. * 
  * -------------------------------------------------------------------------------
  * 
  * Per-thread bucket allocator
@@ -42,10 +42,13 @@
 
 #include "iibmalloc_common.h"
 
+namespace nodecpp::iibmalloc
+{
+
 #define GET_PERF_DATA
 
 #ifdef GET_PERF_DATA
-#ifdef _MSC_VER
+#ifdef NODECPP_MSVC
 #include <intrin.h>
 #else
 #include <x86intrin.h>
@@ -99,8 +102,8 @@ struct MemoryBlockListItem
 
 	void listInsertNext(MemoryBlockListItem* other)
 	{
-		assert(isInList());
-		assert(!other->isInList());
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isInList() );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !other->isInList() );
 
 		other->next = this->next;
 		other->prev = this;
@@ -124,16 +127,16 @@ struct MemoryBlockListItem
 			return false;
 		else
 		{
-			assert(prev != nullptr);
-			assert(next != nullptr);
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev != nullptr);
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next != nullptr);
 			return true;
 		}
 	}
 
 	void removeFromList()
 	{
-		assert(prev != nullptr);
-		assert(next != nullptr);
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev != nullptr);
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next != nullptr);
 
 		prev->next = next;
 		next->prev = prev;
@@ -163,31 +166,31 @@ public:
 		lst.listInitializeEmpty();
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	bool empty() const { return count == 0; }
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		uint32_t size() const { return count; }
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		bool isEnd(MemoryBlockListItem* item) const { return item == &lst; }
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	MemoryBlockListItem* front()
 
 	{
 		return lst.listGetNext();
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	void pushFront(MemoryBlockListItem* chk)
 	{
 		lst.listInsertNext(chk);
 		++count;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	MemoryBlockListItem* popFront()
 	{
-		assert(!empty());
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !empty());
 
 		MemoryBlockListItem* chk = lst.listGetNext();
 		chk->removeFromList();
@@ -196,10 +199,10 @@ public:
 		return chk;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 		MemoryBlockListItem* popBack()
 	{
-		assert(!empty());
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !empty());
 
 		MemoryBlockListItem* chk = lst.listGetPrev();
 		chk->removeFromList();
@@ -208,7 +211,7 @@ public:
 		return chk;
 	}
 
-	FORCE_INLINE
+	NODECPP_FORCEINLINE
 	void remove(MemoryBlockListItem* chk)
 	{
 		chk->removeFromList();
@@ -237,13 +240,13 @@ struct BlockStats
 
 	void printStats() const
 	{
-		printf("Allocs %zd (%zd), ", sysAllocCount, sysAllocSize);
-		printf("Deallocs %zd (%zd), ", sysDeallocCount, sysDeallocSize);
+		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "Allocs {} ({}), ", sysAllocCount, sysAllocSize);
+		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "Deallocs {} ({}), ", sysDeallocCount, sysDeallocSize);
 
 		uint64_t ct = sysAllocCount - sysDeallocCount;
 		uint64_t sz = sysAllocSize - sysDeallocSize;
 
-		printf("Diff %zd (%zd)\n\n", ct, sz);
+		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "Diff {} ({})\n", ct, sz);
 	}
 
 	void registerAllocRequest( size_t sz )
@@ -287,7 +290,7 @@ public:
 	{
 		stats.registerAllocRequest( sz );
 
-		assert(isAlignedExp(sz, blockSizeExp));
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isAlignedExp(sz, blockSizeExp));
 
 		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
@@ -390,7 +393,7 @@ public:
 	{
 		stats.registerAllocRequest( sz );
 
-		assert(isAlignedExp(sz, blockSizeExp));
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isAlignedExp(sz, blockSizeExp));
 
 		size_t ix = (sz >> blockSizeExp)-1;
 		if (ix < max_cached_size)
@@ -423,7 +426,7 @@ public:
 	{
 		stats.registerAllocRequest( sz );
 
-		assert(isAlignedExp(sz, blockSizeExp));
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isAlignedExp(sz, blockSizeExp));
 
 		uint64_t start = __rdtsc();
 		void* ptr = VirtualMemory::allocate(sz);
@@ -488,7 +491,7 @@ public:
 		void* ret = VirtualMemory::CommitMemory( addr, size);
 		if (ret == (void*)(-1))
 		{
-			printf( "Committing failed at %zd (%zx) (0x%zx bytes in total)\n", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
+			nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "Committing failed at {} ({:x}) (0x{:x} bytes in total)", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
 		}
 		return ret;
 	}
@@ -501,5 +504,7 @@ public:
 		VirtualMemory::FreeAddressSpace( addr, size );
 	}
 };
+
+} // namespace nodecpp::iibmalloc
 
 #endif //PAGE_ALLOCATOR_H

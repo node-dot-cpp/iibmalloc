@@ -37,6 +37,8 @@
 
 #include "iibmalloc_common.h"
 #include "iibmalloc_page_allocator.h"
+#include <map>
+
 
 namespace nodecpp::iibmalloc
 {
@@ -1155,6 +1157,8 @@ protected:
 	void** zombieBucketsFirst[BucketCount];
 	void** zombieBucketsLast[BucketCount];
 	void* zombieLargeChunks;
+
+	std::map<uint8_t*, size_t, std::greater<uint8_t*>> zombieMap;
 	
 public:
 	SafeIibAllocator() { initialize(); }
@@ -1194,6 +1198,9 @@ public:
 		void* ptr = reinterpret_cast<uint8_t*>(userPtr) - guaranteed_prefix_size;
 		if(ptr)
 		{
+			size_t allocSize = IibAllocatorBase::getAllocatedSize(ptr);
+			zombieMap.insert( std::make_pair( reinterpret_cast<uint8_t*>(ptr), allocSize ) );
+
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
 			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 			if ( offsetInPage != memForbidden ) // small and medium size
@@ -1227,8 +1234,18 @@ public:
 		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
 	}
 
+	NODECPP_FORCEINLINE bool isPointerNotZombie( void* ptr )
+	{
+		auto iter = zombieMap.upper_bound( reinterpret_cast<uint8_t*>( ptr ) );
+		if ( iter != zombieMap.end() )
+			return reinterpret_cast<uint8_t*>( ptr ) > iter->first + iter->second;
+		else
+			return true;
+	}
+
 	NODECPP_FORCEINLINE void killAllZombies()
 	{
+		zombieMap.clear();
 		for ( size_t idx=0; idx<BucketCount; ++idx)
 		{
 			if ( zombieBucketsLast[idx] )

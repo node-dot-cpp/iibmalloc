@@ -1236,9 +1236,12 @@ public:
 
 	NODECPP_FORCEINLINE bool isPointerNotZombie( void* ptr )
 	{
-		auto iter = zombieMap.upper_bound( reinterpret_cast<uint8_t*>( ptr ) );
+		auto iter = zombieMap.lower_bound( reinterpret_cast<uint8_t*>( ptr ) );
 		if ( iter != zombieMap.end() )
-			return reinterpret_cast<uint8_t*>( ptr ) > iter->first + iter->second;
+		{
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ptr >= iter->first );
+			return reinterpret_cast<uint8_t*>( ptr ) >= iter->first + iter->second;
+		}
 		else
 			return true;
 	}

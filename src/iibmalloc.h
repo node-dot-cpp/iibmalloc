@@ -1168,7 +1168,7 @@ protected:
 	void* zombieLargeChunks;
 
 #ifdef NODECPP_ENABLE_ZOMBIE_ACCESS_EARLY_DETECTION
-	std::map<uint8_t*, size_t, std::greater<uint8_t*>> zombieMap;
+	std::map<uint8_t*, size_t, std::greater<uint8_t*>> zombieMap; // TODO: consider using thread-local allocator
 	bool doZombieEarlyDetection_ = false;
 #endif // NODECPP_ENABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	
@@ -1185,6 +1185,7 @@ public:
 	bool doZombieEarlyDetection( bool doIt = true )
 	{
 #ifdef NODECPP_ENABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, zombieMap.empty(), "to (re)set doZombieEarlyDetection() zombieMap must be empty" );
 		bool ret = doZombieEarlyDetection_;
 		doZombieEarlyDetection_ = doIt;
 		return ret;

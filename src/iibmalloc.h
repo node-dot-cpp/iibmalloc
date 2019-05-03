@@ -1279,6 +1279,7 @@ public:
 	NODECPP_FORCEINLINE void killAllZombies()
 	{
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, doZombieEarlyDetection_ || ( !doZombieEarlyDetection_ && zombieMap.empty() ) );
 		zombieMap.clear();
 #endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 		for ( size_t idx=0; idx<BucketCount; ++idx)
@@ -1326,6 +1327,10 @@ public:
 	void deinitialize()
 	{
 		IibAllocatorBase::deinitialize();
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, doZombieEarlyDetection_ || ( !doZombieEarlyDetection_ && zombieMap.empty() ) );
+		zombieMap.clear();
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	}
 
 	~SafeIibAllocator()

@@ -4,7 +4,6 @@ project(iibmalloc)
 find_package(Threads)
 
 set(LIB_NAME iibmalloc)
-set(LIB_NAME iibmalloc)
 set(LIB_D_NAME iibmalloc_d)
 set(TEST_BIN_NAME test_iibmalloc.bin)
 set(TEST_D_BIN_NAME test_iibmalloc_d.bin)

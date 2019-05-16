@@ -53,27 +53,40 @@ namespace nodecpp::iibmalloc
 
 using namespace nodecpp::iibmalloc;
 
-#if 0
+#ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 void* operator new(std::size_t count)
 {
-	return g_AllocManager.allocate(count);
+	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
+		return g_AllocManager.allocate(count);
+	else
+		return malloc(count);
 }
 
 void* operator new[](std::size_t count)
 {
-	return g_AllocManager.allocate(count);
+	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
+		return g_AllocManager.allocate(count);
+	else
+		return malloc(count);
 }
 
 void operator delete(void* ptr) noexcept
 {
-	g_AllocManager.deallocate(ptr);
+	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
+		g_AllocManager.deallocate(ptr);
+	else
+		free(ptr);
 }
 
 void operator delete[](void* ptr) noexcept
 {
-	g_AllocManager.deallocate(ptr);
+	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
+		g_AllocManager.deallocate(ptr);
+	else
+		free(ptr);
 }
-#endif // 0
+#endif // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
 #if __cplusplus >= 201703L
 
 //We don't support alignment new/delete yet

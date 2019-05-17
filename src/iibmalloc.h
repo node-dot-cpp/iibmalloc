@@ -793,9 +793,6 @@ protected:
 	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4, 3> PageAllocatorT;
 	PageAllocatorT pageAllocator;
 
-protected:
-	bool intercept_new_delete_operators_flag = false;
-
 public:
 #ifdef USE_EXP_BUCKET_SIZES
 	static constexpr
@@ -957,17 +954,6 @@ public:
 	IibAllocatorBase(IibAllocatorBase&&) = default;
 	IibAllocatorBase& operator=(const IibAllocatorBase&) = delete;
 	IibAllocatorBase& operator=(IibAllocatorBase&&) = default;
-
-//	void enable() {}
-//	void disable() {}
-
-	NODECPP_FORCEINLINE bool isInterceptionOfNewDeleteOperatorsEnabled() { return intercept_new_delete_operators_flag; }
-	bool interceptNewDeleteOperators( bool doIntercept ) {
-		bool ret = intercept_new_delete_operators_flag;
-		intercept_new_delete_operators_flag = doIntercept;
-		return ret;
-	}
-
 
 	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
 	{
@@ -1184,8 +1170,6 @@ public:
 
 //	void enable() {}
 //	void disable() {}
-	NODECPP_FORCEINLINE bool isInterceptionOfNewDeleteOperatorsEnabled() { return IibAllocatorBase::isInterceptionOfNewDeleteOperatorsEnabled(); }
-	bool interceptNewDeleteOperators( bool doIntercept ) { return IibAllocatorBase::interceptNewDeleteOperators( doIntercept ); }
 
 	bool doZombieEarlyDetection( bool doIt = true )
 	{
@@ -1359,6 +1343,8 @@ typedef SafeIibAllocator ThreadLocalAllocatorT;
 #endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
 
 extern thread_local ThreadLocalAllocatorT g_AllocManager;
+
+ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator );
 
 } // namespace nodecpp::iibmalloc
 

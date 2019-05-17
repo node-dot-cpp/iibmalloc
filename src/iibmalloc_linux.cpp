@@ -49,6 +49,12 @@
 namespace nodecpp::iibmalloc
 {
 	thread_local ThreadLocalAllocatorT g_AllocManager;
+	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
+	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
+		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
+		g_CurrentAllocManager = allocator;
+		return ret;
+	}
 }
 
 using namespace nodecpp::iibmalloc;
@@ -56,32 +62,32 @@ using namespace nodecpp::iibmalloc;
 #ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 void* operator new(std::size_t count)
 {
-	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
-		return g_AllocManager.allocate(count);
+	if ( g_CurrentAllocManager )
+		return g_CurrentAllocManager->allocate(count);
 	else
 		return malloc(count);
 }
 
 void* operator new[](std::size_t count)
 {
-	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
-		return g_AllocManager.allocate(count);
+	if ( g_CurrentAllocManager )
+		return g_CurrentAllocManager->allocate(count);
 	else
 		return malloc(count);
 }
 
 void operator delete(void* ptr) noexcept
 {
-	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
-		g_AllocManager.deallocate(ptr);
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
 	else
 		free(ptr);
 }
 
 void operator delete[](void* ptr) noexcept
 {
-	if ( g_AllocManager.isInterceptionOfNewDeleteOperatorsEnabled() )
-		g_AllocManager.deallocate(ptr);
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
 	else
 		free(ptr);
 }

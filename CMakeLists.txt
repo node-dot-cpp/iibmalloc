@@ -9,6 +9,7 @@ set(TEST_BIN_NAME test_iibmalloc.bin)
 set(TEST_D_BIN_NAME test_iibmalloc_d.bin)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/foundation build)
+
 if(MSVC OR MSYS OR MINGW)
 	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 	set(SOURCE_LIB src/page_allocator_windows.cpp src/iibmalloc_windows.cpp )
@@ -23,7 +24,7 @@ else()
 	add_definitions( -Wno-unused-parameter )
 	add_definitions( -Wno-empty-body )
 	add_definitions(-fexceptions)
-	add_definitions(-flto )
+	add_definitions(-lto )
 	add_definitions(-fnon-call-exceptions)
 	add_definitions(-lpthread)
 	add_compile_options(-O2)
@@ -36,7 +37,6 @@ include_directories(include  ${PROJECT_SOURCE_DIR}/src/foundation/3rdparty/fmt/i
 							 ${PROJECT_SOURCE_DIR}/src	)
 
 set (SOURCE_EXE  test/test_common.cpp test/random_test.cpp  )
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")

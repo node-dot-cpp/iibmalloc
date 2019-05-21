@@ -8,6 +8,7 @@ set(LIB_D_NAME iibmalloc_d)
 set(TEST_BIN_NAME test_iibmalloc.bin)
 set(TEST_D_BIN_NAME test_iibmalloc_d.bin)
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/foundation build)
 if(MSVC OR MSYS OR MINGW)
 	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 	set(SOURCE_LIB src/page_allocator_windows.cpp src/iibmalloc_windows.cpp )
@@ -25,9 +26,9 @@ else()
 	add_definitions(-flto )
 	add_definitions(-fnon-call-exceptions)
 	add_definitions(-lpthread)
+	add_compile_options(-O2)
 endif()
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/foundation build)
 
 include_directories(include  ${PROJECT_SOURCE_DIR}/src/foundation/3rdparty/fmt/include
 							 ${PROJECT_SOURCE_DIR}/src/foundation/include
@@ -40,7 +41,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE " ${CMAKE_CXX_FLAGS_RELEASE}  -DNDEBUG")
-set(CMAKE_CXX_FLAGS  " ${CMAKE_CXX_FLAGS} -O2 " )
+#set(CMAKE_CXX_FLAGS  " ${CMAKE_CXX_FLAGS} -O2 " )
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/lib)
@@ -74,7 +75,7 @@ endif (UNIX)
 
 if(UNIX)
 	add_test( Build_iibmalloc_test  make ${TEST_BIN_NAME} )
-	add_test( Builf_iibmalloc_test_d  make ${TEST_D_BIN_NAME} )
-	add_test( Run_iibmalloc_test "${PROJECT_SOURCE_DIR}/build/bin/${TEST_BIN_NAME}" )
-	add_test( Rub_iibmalloc_test_d "${PROJECT_SOURCE_DIR}/build/bin/${TEST_D_BIN_NAME}" )
+	add_test( Build_iibmalloc_test_d  make ${TEST_D_BIN_NAME} )
+	#add_test( Run_iibmalloc_test "${PROJECT_SOURCE_DIR}/build/bin/${TEST_BIN_NAME}" )
+	#add_test( Rub_iibmalloc_test_d "${PROJECT_SOURCE_DIR}/build/bin/${TEST_D_BIN_NAME}" )
 endif(UNIX)

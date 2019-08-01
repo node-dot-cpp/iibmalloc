@@ -49,31 +49,50 @@
 namespace nodecpp::iibmalloc
 {
 	thread_local ThreadLocalAllocatorT g_AllocManager;
+	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
+	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
+		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
+		g_CurrentAllocManager = allocator;
+		return ret;
+	}
 }
 
 using namespace nodecpp::iibmalloc;
 
-#if 0
+#ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 void* operator new(std::size_t count)
 {
-	return g_AllocManager.allocate(count);
+	if ( g_CurrentAllocManager )
+		return g_CurrentAllocManager->allocate(count);
+	else
+		return malloc(count);
 }
 
 void* operator new[](std::size_t count)
 {
-	return g_AllocManager.allocate(count);
+	if ( g_CurrentAllocManager )
+		return g_CurrentAllocManager->allocate(count);
+	else
+		return malloc(count);
 }
 
 void operator delete(void* ptr) noexcept
 {
-	g_AllocManager.deallocate(ptr);
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
+	else
+		free(ptr);
 }
 
 void operator delete[](void* ptr) noexcept
 {
-	g_AllocManager.deallocate(ptr);
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
+	else
+		free(ptr);
 }
-#endif // 0
+#endif // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
 #if __cplusplus >= 201703L
 
 //We don't support alignment new/delete yet

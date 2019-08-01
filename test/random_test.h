@@ -296,10 +296,10 @@ public:
 		start = GetMillisecondCount();
 		testRes->rdtscBegin = __rdtsc();
 		g_AllocManager.initialize();
-		g_AllocManager.enable();
+//		g_AllocManager.enable();
 	}
 
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 	void* allocate( size_t sz ) { 
 		void* ret = g_AllocManager.zombieableAllocate( sz ); 
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, g_AllocManager.isZombieablePointerInBlock(ret, ret)); 
@@ -320,16 +320,16 @@ public:
 #endif
 	void deinit()
 	{
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
 #endif
 		g_AllocManager.deinitialize();
-		g_AllocManager.disable();
+//		g_AllocManager.disable();
 	}
 
 	void doWhateverAfterSetupPhase()
 	{
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
 #endif
 		testRes->rdtscSetup = __rdtsc();
@@ -343,14 +343,14 @@ public:
 
 	void doWhateverWithinMainLoopPhase()
 	{
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
 #endif
 	}
 
 	void doWhateverAfterMainLoopPhase()
 	{
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
 #endif
 		testRes->rdtscMainLoop = __rdtsc();
@@ -364,7 +364,7 @@ public:
 
 	void doWhateverAfterCleanupPhase()
 	{
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		g_AllocManager.killAllZombies();
 #endif
 		testRes->rdtscExit = __rdtsc();

@@ -35,8 +35,14 @@
 #ifndef IIBMALLOC_H
 #define IIBMALLOC_H
 
+
 #include "iibmalloc_common.h"
 #include "iibmalloc_page_allocator.h"
+
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+#include <map>
+#endif
+
 
 namespace nodecpp::iibmalloc
 {
@@ -787,7 +793,6 @@ protected:
 	typedef SoundingAddressPageAllocator<PageAllocatorWithCaching, BucketCountExp, reservation_size_exp, 4, 3> PageAllocatorT;
 	PageAllocatorT pageAllocator;
 
-protected:
 public:
 #ifdef USE_EXP_BUCKET_SIZES
 	static constexpr
@@ -949,10 +954,6 @@ public:
 	IibAllocatorBase(IibAllocatorBase&&) = default;
 	IibAllocatorBase& operator=(const IibAllocatorBase&) = delete;
 	IibAllocatorBase& operator=(IibAllocatorBase&&) = default;
-
-	void enable() {}
-	void disable() {}
-
 
 	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
 	{
@@ -1142,9 +1143,8 @@ public:
 	}
 };
 
-#define ENABLE_SAFE_ALLOCATION_MEANS // TODO: consider making project-level
 
-#ifdef ENABLE_SAFE_ALLOCATION_MEANS
+#ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 
 constexpr size_t guaranteed_prefix_size = 8;
 
@@ -1155,6 +1155,11 @@ protected:
 	void** zombieBucketsFirst[BucketCount];
 	void** zombieBucketsLast[BucketCount];
 	void* zombieLargeChunks;
+
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+	std::map<uint8_t*, size_t, std::greater<uint8_t*>> zombieMap; // TODO: consider using thread-local allocator
+	bool doZombieEarlyDetection_ = true;
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	
 public:
 	SafeIibAllocator() { initialize(); }
@@ -1163,8 +1168,20 @@ public:
 	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
 	SafeIibAllocator& operator=(SafeIibAllocator&&) = default;
 
-	void enable() {}
-	void disable() {}
+//	void enable() {}
+//	void disable() {}
+
+	bool doZombieEarlyDetection( bool doIt = true )
+	{
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, zombieMap.empty(), "to (re)set doZombieEarlyDetection() zombieMap must be empty" );
+		bool ret = doZombieEarlyDetection_;
+		doZombieEarlyDetection_ = doIt;
+		return ret;
+#else
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, false, "to doZombieEarlyDetection() first define NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION" );
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+	}
 
 
 	NODECPP_FORCEINLINE void* allocate(size_t sz)
@@ -1194,6 +1211,14 @@ public:
 		void* ptr = reinterpret_cast<uint8_t*>(userPtr) - guaranteed_prefix_size;
 		if(ptr)
 		{
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+			if ( doZombieEarlyDetection_ )
+			{
+				size_t allocSize = IibAllocatorBase::getAllocatedSize(ptr);
+				zombieMap.insert( std::make_pair( reinterpret_cast<uint8_t*>(ptr), allocSize ) );
+			}
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+
 			size_t offsetInPage = PageAllocatorT::getOffsetInPage( ptr );
 			constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
 			if ( offsetInPage != memForbidden ) // small and medium size
@@ -1227,8 +1252,31 @@ public:
 		return ptr >= allocatedPtr && reinterpret_cast<uint8_t*>(ptr) < reinterpret_cast<uint8_t*>(allocatedPtr) + IibAllocatorBase::getAllocatedSize( trueAllocatedPtr );
 	}
 
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+	NODECPP_FORCEINLINE bool isPointerNotZombie( void* ptr )
+	{
+		if ( doZombieEarlyDetection_ )
+		{
+			auto iter = zombieMap.lower_bound( reinterpret_cast<uint8_t*>( ptr ) );
+			if ( iter != zombieMap.end() )
+			{
+				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ptr >= iter->first );
+				return reinterpret_cast<uint8_t*>( ptr ) >= iter->first + iter->second;
+			}
+			else
+				return true;
+		}
+		else
+			return true;
+	}
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+
 	NODECPP_FORCEINLINE void killAllZombies()
 	{
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, doZombieEarlyDetection_ || ( !doZombieEarlyDetection_ && zombieMap.empty() ) );
+		zombieMap.clear();
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 		for ( size_t idx=0; idx<BucketCount; ++idx)
 		{
 			if ( zombieBucketsLast[idx] )
@@ -1266,11 +1314,18 @@ public:
 			zombieBucketsLast[i] = nullptr;
 		}
 		zombieLargeChunks = nullptr;
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		doZombieEarlyDetection_ = true;
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	}
 
 	void deinitialize()
 	{
 		IibAllocatorBase::deinitialize();
+#ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, doZombieEarlyDetection_ || ( !doZombieEarlyDetection_ && zombieMap.empty() ) );
+		zombieMap.clear();
+#endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	}
 
 	~SafeIibAllocator()
@@ -1278,16 +1333,18 @@ public:
 	}
 };
 
-#endif // ENABLE_SAFE_ALLOCATION_MEANS
+#endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
 
 
-#ifndef ENABLE_SAFE_ALLOCATION_MEANS
+#ifdef NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
 typedef IibAllocatorBase ThreadLocalAllocatorT;
 #else
 typedef SafeIibAllocator ThreadLocalAllocatorT;
-#endif // ENABLE_SAFE_ALLOCATION_MEANS
+#endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
 
 extern thread_local ThreadLocalAllocatorT g_AllocManager;
+
+ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator );
 
 } // namespace nodecpp::iibmalloc
 

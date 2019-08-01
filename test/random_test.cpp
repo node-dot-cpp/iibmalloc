@@ -210,6 +210,8 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 
 int main()
 {
+	nodecpp::log::init_log();
+
 	TestRes testRes[max_threads];
 
 	if( 1 )

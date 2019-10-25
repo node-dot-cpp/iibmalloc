@@ -55,13 +55,25 @@ namespace nodecpp::iibmalloc
 
 using namespace nodecpp::iibmalloc;
 
+#define NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
 #ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+int ctrNew = 0, ctrDel = 0;
 void* operator new(std::size_t count)
 {
+	++ctrNew;
 	if ( g_CurrentAllocManager )
-		return g_CurrentAllocManager->allocate(count);
+	{
+		void* ret = g_CurrentAllocManager->allocate(count);
+printf( "%d: created 0x%zx (our)\n", ctrNew, (size_t)ret );
+		return ret;
+	}
 	else
-		return malloc(count);
+	{
+		void* ret = malloc(count);
+printf( "%d: created 0x%zx (std)\n", ctrNew, (size_t)ret );
+		return ret;
+	}
 }
 
 void* operator new[](std::size_t count)
@@ -74,6 +86,8 @@ void* operator new[](std::size_t count)
 
 void operator delete(void* ptr) noexcept
 {
+++ctrDel;
+printf( "%d: deleting 0x%zx (%s)\n", ctrDel, (size_t)ptr, g_CurrentAllocManager ? "our" : "std" );
 	if ( g_CurrentAllocManager )
 		g_CurrentAllocManager->deallocate(ptr);
 	else

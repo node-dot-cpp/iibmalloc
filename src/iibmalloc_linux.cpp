@@ -59,6 +59,8 @@ namespace nodecpp::iibmalloc
 
 using namespace nodecpp::iibmalloc;
 
+#define NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
 #ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 void* operator new(std::size_t count)
 {

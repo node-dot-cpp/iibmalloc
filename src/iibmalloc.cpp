@@ -34,17 +34,29 @@
 
 #include "iibmalloc.h"
 
-#include <cstdlib>
-#include <cstddef>
-#include <memory>
-#include <cstring>
-#include <limits>
-
-#include <windows.h>
-
 namespace nodecpp::iibmalloc
 {
 	thread_local ThreadLocalAllocatorT g_AllocManager;
+}
+
+using namespace nodecpp::iibmalloc;
+
+#ifdef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
+namespace nodecpp::iibmalloc
+{
+	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
+		return nullptr;
+	}
+}
+
+#else // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+// We need it as a workaround because of P0302R0
+//    http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0302r0.html
+// if we want lambda-related allocations to be done with a specific allocator
+
+namespace nodecpp::iibmalloc
+{
 	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
 	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
 		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
@@ -53,25 +65,16 @@ namespace nodecpp::iibmalloc
 	}
 }
 
-using namespace nodecpp::iibmalloc;
-
-#define NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
-
-#ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
-int ctrNew = 0, ctrDel = 0;
 void* operator new(std::size_t count)
 {
-	++ctrNew;
 	if ( g_CurrentAllocManager )
 	{
 		void* ret = g_CurrentAllocManager->allocate(count);
-printf( "%d: created 0x%zx (our)\n", ctrNew, (size_t)ret );
 		return ret;
 	}
 	else
 	{
 		void* ret = malloc(count);
-printf( "%d: created 0x%zx (std)\n", ctrNew, (size_t)ret );
 		return ret;
 	}
 }
@@ -86,8 +89,6 @@ void* operator new[](std::size_t count)
 
 void operator delete(void* ptr) noexcept
 {
-++ctrDel;
-printf( "%d: deleting 0x%zx (%s)\n", ctrDel, (size_t)ptr, g_CurrentAllocManager ? "our" : "std" );
 	if ( g_CurrentAllocManager )
 		g_CurrentAllocManager->deallocate(ptr);
 	else

@@ -34,14 +34,8 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\iibmalloc_windows.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\page_allocator_windows.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\iibmalloc_linux.cpp">
-      <Filter>linux-staff-for-quick-editing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\page_allocator_linux.cpp">
       <Filter>linux-staff-for-quick-editing</Filter>
@@ -54,5 +48,8 @@
     </ClCompile>
     <ClCompile Include="..\..\src\foundation\3rdparty\fmt\src\format.cc" />
     <ClCompile Include="..\..\src\foundation\src\log.cpp" />
+    <ClCompile Include="..\..\src\iibmalloc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

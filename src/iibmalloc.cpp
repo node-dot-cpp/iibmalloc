@@ -34,14 +34,6 @@
 
 #include "iibmalloc.h"
 
-#include <cstdlib>
-#include <cstddef>
-#include <memory>
-#include <cstring>
-#include <limits>
-
-#include <windows.h>
-
 namespace nodecpp::iibmalloc
 {
 	thread_local ThreadLocalAllocatorT g_AllocManager;

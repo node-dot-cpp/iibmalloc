@@ -57,15 +57,6 @@ void allocLog(const char* formatStr, const ARGS&... args)
 }
 
 /*static*/
-size_t VirtualMemory::getPageSize()
-{
-	SYSTEM_INFO siSysInfo;
-	GetSystemInfo(&siSysInfo);
-
-	return static_cast<size_t>(siSysInfo.dwPageSize);
-}
-
-/*static*/
 size_t VirtualMemory::getAllocGranularity()
 {
 	SYSTEM_INFO siSysInfo;
@@ -125,6 +116,15 @@ void VirtualMemory::decommit(uintptr_t addr, size_t size)
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, r);
 }
 #endif // 0
+
+/*static*/
+size_t VirtualMemory::getPageSize()
+{
+	SYSTEM_INFO siSysInfo;
+	GetSystemInfo(&siSysInfo);
+
+	return static_cast<size_t>(siSysInfo.dwPageSize);
+}
 
 void* VirtualMemory::allocate(size_t size)
 {

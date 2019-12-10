@@ -150,6 +150,9 @@ void doTest( TestStartupParamsAndResults* startupParams )
 
 void runComparisonTest( TestStartupParamsAndResults& params )
 {
+	size_t memPageSize = VirtualMemory::getPageSize();
+	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "Memory page size: {} (0x{:x}) bytes", memPageSize, memPageSize );
+	
 	size_t start, end;
 	size_t threadCount = params.startupParams.threadCount;
 

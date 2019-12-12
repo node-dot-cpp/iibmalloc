@@ -47,8 +47,6 @@
 
 using namespace nodecpp::iibmalloc;
 
-thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
-
 // limit below is single read or write op in linux
 static constexpr size_t MAX_LINUX = 0x7ffff000;
 // [DI: what depends on what/] static_assert(MAX_LINUX <= MAX_CHUNK_SIZE, "Use of big chunks needs review.");
@@ -68,24 +66,6 @@ size_t VirtualMemory::getAllocGranularity()
 	return getPageSize();
 }
 
-
-/*static*/
-uint8_t* VirtualMemory::reserve(void* addr, size_t size)
-{
-	return nullptr;
-}
-
-/*static*/
-void VirtualMemory::commit(uintptr_t addr, size_t size)
-{
-	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, false);
-}
-
-///*static*/
-void VirtualMemory::decommit(uintptr_t addr, size_t size)
-{
-	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, false);
-}
 
 void* VirtualMemory::allocate(size_t size)
 {

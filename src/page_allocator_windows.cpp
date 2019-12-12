@@ -44,18 +44,6 @@
 
 using namespace nodecpp::iibmalloc;
 
-//thread_local PageAllocatorWithCaching thg_PageAllocatorWithCaching;
-
-#if 0
-template< typename... ARGS >
-void allocLog(const char* formatStr, const ARGS&... args)
-{
-	constexpr size_t string_max = 255;
-	char buff[string_max+1];
-	snprintf(buff, string_max, formatStr, args...);
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::error>( "{}", buff);
-}
-
 /*static*/
 size_t VirtualMemory::getAllocGranularity()
 {
@@ -64,58 +52,6 @@ size_t VirtualMemory::getAllocGranularity()
 
 	return static_cast<size_t>(siSysInfo.dwAllocationGranularity);
 }
-
-/*static*/
-uint8_t* VirtualMemory::reserve(void* addr, size_t size)
-{
-	void* ptr = VirtualAlloc(addr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-	if (!addr)
-	{
-		allocLog("VirtualMemory::reserve {} 0x{:x}", (size_t)(ptr), size);
-	}
-	else if (addr == ptr)
-	{
-		allocLog("VirtualMemory::reserve {} 0x{:x}", (size_t)(ptr), size);
-	}
-	else
-	{
-		allocLog("VirtualMemory::reserve  {} 0x{:x} FAILED", (size_t)(addr), size);
-
-		MEMORY_BASIC_INFORMATION info;
-		SIZE_T s = VirtualQuery(addr, &info, size);
-
-
-		allocLog("BaseAddress={}", (size_t)(info.BaseAddress));
-		allocLog("AllocationBase={}", (size_t)(info.AllocationBase));
-		allocLog("RegionSize={}", info.RegionSize);
-		allocLog("State={}", info.State);
-
-		allocLog("Failed to get the required address range");
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, false);
-		return nullptr;
-	}
-
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::error>( "  allocating {}", size );
-	return static_cast<uint8_t*>(ptr);
-}
-
-/*static*/
-void VirtualMemory::commit(uintptr_t addr, size_t size)
-{
-	// TODO: revise necessity
-	void* ptr = VirtualAlloc(reinterpret_cast<void*>(addr), size, MEM_COMMIT, PAGE_READWRITE);
-	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ptr);
-}
-
-/*static*/
-void VirtualMemory::decommit(uintptr_t addr, size_t size)
-{
-	// TODO: revise necessity
-	BOOL r = VirtualFree(reinterpret_cast<void*>(addr), size, MEM_DECOMMIT);
-	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, r);
-}
-#endif // 0
 
 /*static*/
 size_t VirtualMemory::getPageSize()

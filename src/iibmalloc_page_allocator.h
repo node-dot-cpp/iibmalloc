@@ -63,17 +63,14 @@ public:
 	static size_t getPageSize();
 	static size_t getAllocGranularity();
 
-	static unsigned char* reserve(void* addr, size_t size);
-	static void commit(uintptr_t addr, size_t size); // TODO: revise necessity (duplicates might beavailable)
-	static void decommit(uintptr_t addr, size_t size); // TODO: revise necessity (duplicates might be available)
-
 	static void* allocate(size_t size);
 	static void deallocate(void* ptr, size_t size);
 
 	static void* AllocateAddressSpace(size_t size);
+	static void FreeAddressSpace(void* addr, size_t size);
+
 	static void* CommitMemory(void* addr, size_t size);
 	static void DecommitMemory(void* addr, size_t size);
-	static void FreeAddressSpace(void* addr, size_t size);
 };
 
 struct MemoryBlockListItem

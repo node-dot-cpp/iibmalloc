@@ -125,12 +125,12 @@ inline void testDistribution()
 				if ( val <= (((size_t)1)<<j) && val > (((size_t)1)<<(j-1) ) )
 					bins[j] += 1;
 	}
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "<=3: {}", bins[0] + bins[1] + bins[2] + bins[3] );
+	nodecpp::default_log::info( "<=3: {}", bins[0] + bins[1] + bins[2] + bins[3] );
 	total = 0;
 	for ( size_t j=0; j<=exp; ++j )
 	{
 		total += bins[j];
-		nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}: {}", j, bins[j] );
+		nodecpp::default_log::info( "{}: {}", j, bins[j] );
 	}
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, total == testCnt );
 }
@@ -179,21 +179,21 @@ struct ThreadTestRes : public CommonTestResults
 void printThreadStats( const char* prefix, ThreadTestRes& res )
 {
 	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
-//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+//	nodecpp::default_log::info( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	nodecpp::default_log::info( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 }
 
 void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 {
 	uint64_t rdtscTotal = res.rdtscExit - res.rdtscBegin;
-//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
+//	nodecpp::default_log::info( "{}{}: {}ms; {} ({} | {} | {});", prefix, res.threadID, res.innerDur, rdtscTotal, res.rdtscSetup - res.rdtscBegin, res.rdtscMainLoop - res.rdtscSetup, res.rdtscExit - res.rdtscMainLoop );
+	nodecpp::default_log::info( "{}{}: {}ms; {} ({:.2f} | {:.2f} | {:.2f});", prefix, res.threadID, res.innerDur, rdtscTotal, (res.rdtscSetup - res.rdtscBegin) * 100. / rdtscTotal, (res.rdtscMainLoop - res.rdtscSetup) * 100. / rdtscTotal, (res.rdtscExit - res.rdtscMainLoop) * 100. / rdtscTotal );
 
 	size_t mainLoopAllocCnt = res.sysAllocCallCntAfterMainLoop - res.sysAllocCallCntAfterSetup;
 	uint64_t mainLoopAllocCntRdtsc = res.rdtscSysAllocCallSumAfterMainLoop - res.rdtscSysAllocCallSumAfterSetup;
 	size_t exitAllocCnt = res.sysAllocCallCntAfterExit - res.sysAllocCallCntAfterMainLoop;
 	uint64_t exitAllocCntRdtsc = res.rdtscSysAllocCallSumAfterExit - res.rdtscSysAllocCallSumAfterMainLoop;
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
+	nodecpp::default_log::info( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
 		prefix, 
 		res.allocRequestCountAfterSetup, res.sysAllocCallCntAfterSetup, res.rdtscSysAllocCallSumAfterSetup, res.sysAllocCallCntAfterSetup ? res.rdtscSysAllocCallSumAfterSetup / res.sysAllocCallCntAfterSetup : 0,
 		res.allocRequestCountAfterMainLoop - res.allocRequestCountAfterSetup, mainLoopAllocCnt, mainLoopAllocCntRdtsc, mainLoopAllocCnt ? mainLoopAllocCntRdtsc / mainLoopAllocCnt : 0,
@@ -203,7 +203,7 @@ void printThreadStatsEx( const char* prefix, ThreadTestRes& res )
 	uint64_t mainLoopDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterMainLoop - res.rdtscSysDeallocCallSumAfterSetup;
 	size_t exitDeallocCnt = res.sysDeallocCallCntAfterExit - res.sysDeallocCallCntAfterMainLoop;
 	uint64_t exitDeallocCntRdtsc = res.rdtscSysDeallocCallSumAfterExit - res.rdtscSysDeallocCallSumAfterMainLoop;
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
+	nodecpp::default_log::info( "{}\t[{} -> {}, {} ({})] [{} -> {}, {} ({})] [{} -> {}, {} ({})] ", 
 		prefix, 
 		res.deallocRequestCountAfterSetup, res.sysDeallocCallCntAfterSetup, res.rdtscSysDeallocCallSumAfterSetup, res.sysDeallocCallCntAfterSetup ? res.rdtscSysDeallocCallSumAfterSetup / res.sysDeallocCallCntAfterSetup : 0,
 		res.deallocRequestCountAfterMainLoop - res.deallocRequestCountAfterSetup, mainLoopDeallocCnt, mainLoopDeallocCntRdtsc, mainLoopDeallocCnt ? mainLoopDeallocCntRdtsc / mainLoopDeallocCnt : 0,
@@ -467,7 +467,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 {
 	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
 	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
-//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+//	nodecpp::default_log::info( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
 	size_t dummyCtr = 0;
@@ -601,7 +601,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	allocatorUnderTest.deinit();
 	allocatorUnderTest.doWhateverAfterCleanupPhase();
 		
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
+	nodecpp::default_log::info( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
 }
 #else
 template< class AllocatorUnderTest, MEM_ACCESS_TYPE mat>
@@ -609,7 +609,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 {
 	constexpr bool doMemAccess = mat != MEM_ACCESS_TYPE::none;
 	constexpr bool doFullAccess = mat == MEM_ACCESS_TYPE::full;
-//	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
+//	nodecpp::default_log::info( "rnd_seed = {}, iterCount = {}, maxItems = {}, maxItemSizeExp = {}", rnd_seed, iterCount, maxItems, maxItemSizeExp );
 	allocatorUnderTest.init( threadID );
 
 	size_t dummyCtr = 0;
@@ -741,7 +741,7 @@ void randomPos_RandomSize( AllocatorUnderTest& allocatorUnderTest, size_t iterCo
 	allocatorUnderTest.deinit();
 	allocatorUnderTest.doWhateverAfterCleanupPhase();
 		
-	nodecpp::log::log<nodecpp::iibmalloc::module_id, nodecpp::log::LogLevel::info>( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
+	nodecpp::default_log::info( "about to exit thread {} ({} operations performed) [ctr = {}]...", threadID, iterCount, dummyCtr );
 }
 #endif
 

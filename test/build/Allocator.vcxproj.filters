@@ -23,23 +23,20 @@
     <ClInclude Include="..\..\src\iibmalloc_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\iibmalloc_page_allocator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\random_test.h">
       <Filter>test</Filter>
     </ClInclude>
     <ClInclude Include="..\test_common.h">
       <Filter>test</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\foundation\include\page_allocator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\page_management.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\page_allocator_windows.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\page_allocator_linux.cpp">
-      <Filter>linux-staff-for-quick-editing</Filter>
-    </ClCompile>
     <ClCompile Include="..\random_test.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -51,5 +48,7 @@
     <ClCompile Include="..\..\src\iibmalloc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\foundation\src\nodecpp_assert.cpp" />
+    <ClCompile Include="..\..\src\foundation\src\page_allocator.cpp" />
   </ItemGroup>
 </Project>

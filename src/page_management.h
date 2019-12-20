@@ -222,13 +222,13 @@ struct BlockStats
 
 	void printStats() const
 	{
-		nodecpp::default_log::info( "Allocs {} ({}), ", sysAllocCount, sysAllocSize);
-		nodecpp::default_log::info( "Deallocs {} ({}), ", sysDeallocCount, sysDeallocSize);
+		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "Allocs {} ({}), ", sysAllocCount, sysAllocSize);
+		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "Deallocs {} ({}), ", sysDeallocCount, sysDeallocSize);
 
 		uint64_t ct = sysAllocCount - sysDeallocCount;
 		uint64_t sz = sysAllocSize - sysDeallocSize;
 
-		nodecpp::default_log::info( "Diff {} ({})\n", ct, sz);
+		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "Diff {} ({})\n", ct, sz);
 	}
 
 	void registerAllocRequest( size_t sz )
@@ -473,7 +473,7 @@ public:
 		void* ret = VirtualMemory::CommitMemory( addr, size);
 		if (ret == (void*)(-1))
 		{
-			nodecpp::default_log::info( "Committing failed at {} ({:x}) (0x{:x} bytes in total)", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
+			nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "Committing failed at {} ({:x}) (0x{:x} bytes in total)", stats.allocRequestCount, stats.allocRequestCount, stats.allocRequestSize );
 		}
 		return ret;
 	}

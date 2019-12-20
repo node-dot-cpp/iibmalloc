@@ -48,6 +48,10 @@
 #include <intrin.h>
 #endif
 
+namespace nodecpp
+{
+	constexpr const char* iibmalloc_module_id = "iibmalloc";
+}
 namespace nodecpp::iibmalloc
 {
 	constexpr uint64_t module_id = 2;

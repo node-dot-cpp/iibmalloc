@@ -196,7 +196,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 //		PageBlockDescriptor* pb = new PageBlockDescriptor; // TODO: consider using our own allocator
 		PageBlockDescriptor* pb = pageBlockDescriptors.createNew();
 		pb->blockAddress = getNextBlock();
-//nodecpp::default_log::info( "createNextBlockAndGetPage(): descriptor allocated at 0x{:x}; block = 0x{:x}", (size_t)(pb), (size_t)(pb->blockAddress) );
+//nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "createNextBlockAndGetPage(): descriptor allocated at 0x{:x}; block = 0x{:x}", (size_t)(pb), (size_t)(pb->blockAddress) );
 		memset( pb->nextToUse, 0, sizeof( uint16_t) * bucket_cnt );
 		memset( pb->nextToCommit, 0, sizeof( uint16_t) * bucket_cnt );
 		pb->next = nullptr;
@@ -204,7 +204,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		pageBlockListCurrent = pb;
 //		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx );
 		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx, 0 );
-//	nodecpp::default_log::info( "createNextBlockAndGetPage(): before commit, {}, 0x{:x} -> 0x{:x}", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
+//	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "createNextBlockAndGetPage(): before commit, {}, 0x{:x} -> 0x{:x}", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
 //		void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
 //		this->CommitMemory( ret, PAGE_SIZE );
 		commitRangeOfPageIndexes( pb->blockAddress, reasonIdx, 0, commit_page_cnt );
@@ -212,7 +212,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 		static_assert( commit_page_cnt <= UINT16_MAX, "" );
 		pb->nextToCommit[ reasonIdx ] = (uint16_t)commit_page_cnt;
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
-//	nodecpp::default_log::info( "createNextBlockAndGetPage(): after commit 0x{:x}", (size_t)(ret2) );
+//	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "createNextBlockAndGetPage(): after commit 0x{:x}", (size_t)(ret2) );
 		return ret;
 	}
 
@@ -343,9 +343,9 @@ public:
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
 			indexHead[idx]->nextToUse[idx] = 1;
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
-//	nodecpp::default_log::info( "getPage(): before commit, {}, 0x{:x} -> 0x{:x}", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
+//	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "getPage(): before commit, {}, 0x{:x} -> 0x{:x}", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
 //			void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
-//	nodecpp::default_log::info( "getPage(): after commit 0x{:x}", (size_t)(ret2) );
+//	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "getPage(): after commit 0x{:x}", (size_t)(ret2) );
 //			this->CommitMemory( ret, PAGE_SIZE );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
@@ -412,7 +412,7 @@ public:
 		PageBlockDescriptor* next = pageBlockListStart.next;
 		while( next )
 		{
-//nodecpp::default_log::info( "in block 0x{:x} about to delete 0x{:x} of size 0x{:x}", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
+//nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "in block 0x{:x} about to delete 0x{:x} of size 0x{:x}", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->blockAddress );
 			this->freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), reservation_size );
 			PageBlockDescriptor* tmp = next->next;
@@ -855,7 +855,7 @@ public:
 		sz -= 1;
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz);
-//		nodecpp::default_log::info( "ix = {}", ix );
+//		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "ix = {}", ix );
 		uint8_t addition = 1 & ( sz >> (ix-1) );
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
@@ -869,7 +869,7 @@ public:
 		sz -= 1;
 		unsigned long ix;
 		uint8_t r = _BitScanReverse64(&ix, sz);
-//		nodecpp::default_log::info( "ix = {}", ix );
+//		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "ix = {}", ix );
 		uint8_t addition = 3 & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);
@@ -916,7 +916,7 @@ public:
 //		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 		uint64_t ix = __builtin_clzll(sz);
 		ix = 63ull - ix;
-//		nodecpp::default_log::info( "ix = {}", ix );
+//		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "ix = {}", ix );
 		uint8_t addition = 1ull & ( sz >> (ix-1) );
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
@@ -932,7 +932,7 @@ public:
 //		return (sz <= 8) ? 0 : static_cast<uint8_t>(61ull - ix);
 		uint64_t ix = __builtin_clzll(sz);
 		ix = 63ull - ix;
-//		nodecpp::default_log::info( "ix = {}", ix );
+//		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "ix = {}", ix );
 		uint8_t addition = 3ull & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);

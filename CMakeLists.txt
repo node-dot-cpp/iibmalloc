@@ -1,85 +1,62 @@
+#-------------------------------------------------------------------------------------------
+# Copyright (c) 2020, OLogN Technologies AG
+#-------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.0)
-project(iibmalloc)
+project(iibmalloc CXX)
+set(CMAKE_CXX_STANDARD 17)
+include(CTest)
 
-find_package(Threads)
+#-------------------------------------------------------------------------------------------
+# Defines
+#-------------------------------------------------------------------------------------------
 
-set(LIB_NAME iibmalloc)
-set(LIB_D_NAME iibmalloc_d)
-set(TEST_BIN_NAME test_iibmalloc.bin)
-set(TEST_D_BIN_NAME test_iibmalloc_d.bin)
-
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/foundation build)
-
-
-if(MSVC OR MSYS OR MINGW)
-	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
-	set(SOURCE_LIB ${PROJECT_SOURCE_DIR}/src/page_allocator_windows.cpp )
-
-	add_definitions(/W3)
-	add_definitions(/EHa)
-	add_definitions(/MD)
+if(MSVC)
+	add_compile_options(/W3)
+	add_compile_options(/EHa)
+#	add_compile_options(/MD)
 else()
-	set(SOURCE_LIB ${PROJECT_SOURCE_DIR}/src/page_allocator_linux.cpp )
-	enable_testing()
-	add_definitions( -Wall )
-	add_definitions( -Wextra )
-	add_definitions( -Wno-unused-variable )
-	add_definitions( -Wno-unused-parameter )
-	add_definitions( -Wno-empty-body )
-	add_definitions(-fexceptions)
-	add_definitions(-lto )
-	add_definitions(-fnon-call-exceptions)
-	add_definitions(-lpthread)
+	add_compile_options( -Wall )
+	add_compile_options( -Wextra )
+	add_compile_options( -Wno-unused-variable )
+	add_compile_options( -Wno-unused-parameter )
+	add_compile_options( -Wno-empty-body )
+	add_compile_options(-fexceptions)
+	add_compile_options(-lto )
+	add_compile_options(-fnon-call-exceptions)
+#	add_compile_options(-lpthread)
 	add_compile_options(-O2)
-	set(CMAKE_CXX_STANDARD_REQUIRED on)
-	#set(CMAKE_CXX_FLAGS  " ${CMAKE_CXX_FLAGS} -O2 " )
-	set(CMAKE_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
-	set(CMAKE_CXX_FLAGS_RELEASE " ${CMAKE_CXX_FLAGS_RELEASE}  -DNDEBUG")
 endif()
 
-set(SOURCE_LIB ${SOURCE_LIB}  ${PROJECT_SOURCE_DIR}/src/iibmalloc.cpp)
+#-------------------------------------------------------------------------------------------
+# Library definition
+#-------------------------------------------------------------------------------------------
+add_library(iibmalloc STATIC
+  src/iibmalloc.cpp
+  )
 
-include_directories(include  ${PROJECT_SOURCE_DIR}/src/foundation/3rdparty/fmt/include
-							 ${PROJECT_SOURCE_DIR}/src/foundation/include
-							 ${PROJECT_SOURCE_DIR}/include
-							 ${PROJECT_SOURCE_DIR}/src	)
+#-------------------------------------------------------------------------------------------
+# Export Include Directories
+#-------------------------------------------------------------------------------------------
+target_include_directories(iibmalloc
+  PUBLIC include
+  PUBLIC src
+  )
 
-set (SOURCE_EXE  test/test_common.cpp test/random_test.cpp  )
-set(CMAKE_CXX_STANDARD 17)
+#-------------------------------------------------------------------------------------------
+# Package Dependencies 
+#-------------------------------------------------------------------------------------------
+add_subdirectory(src/foundation)
 
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/bin)
+target_link_libraries(iibmalloc foundation)
 
-add_library( ${LIB_NAME} STATIC ${SOURCE_LIB})
-add_library(${LIB_D_NAME} STATIC ${SOURCE_LIB})
+#-------------------------------------------------------------------------------------------
+# Tests 
+#-------------------------------------------------------------------------------------------
+add_executable(test_iibmalloc
+  test/test_common.cpp
+  test/random_test.cpp
+  )
 
-target_link_libraries( ${LIB_NAME} foundation )
-target_link_libraries( ${LIB_NAME} foundation_d)
+target_link_libraries(test_iibmalloc iibmalloc)
 
-add_executable(${TEST_BIN_NAME}  ${SOURCE_EXE})
-add_executable(${TEST_D_BIN_NAME}  ${SOURCE_EXE})
-
-if (UNIX)
-	set_target_properties ( ${LIB_NAME} PROPERTIES COMPILE_FLAGS  ${CMAKE_CXX_FLAGS_RELEASE})
-	set_target_properties ( ${LIB_D_NAME} PROPERTIES COMPILE_FLAGS  ${CMAKE_CXX_FLAGS_DEBUG} )
-
-	set_target_properties ( ${TEST_BIN_NAME} PROPERTIES COMPILE_FLAGS  ${CMAKE_CXX_FLAGS_RELEASE})
-	set_target_properties ( ${TEST_D_BIN_NAME}  PROPERTIES COMPILE_FLAGS  ${CMAKE_CXX_FLAGS_DEBUG})
-
-	target_link_libraries(${TEST_BIN_NAME}  pthread )
-	target_link_libraries(${TEST_D_BIN_NAME} pthread )
-endif (UNIX)
-
-target_compile_options(${TEST_BIN_NAME} PRIVATE -pthread)
-target_link_libraries(${TEST_BIN_NAME} ${LIB_NAME})
-
-target_compile_options(${TEST_D_BIN_NAME} PRIVATE -pthread)
-target_link_libraries(${TEST_D_BIN_NAME} ${LIB_NAME})
-
-if(UNIX)
-	add_test( Run_iibmalloc_test "${CMAKE_BINARY_DIR}/build/bin/${TEST_BIN_NAME}" )
-	add_test( Rub_iibmalloc_test_d "${CMAKE_BINARY_DIR}/build/bin/${TEST_D_BIN_NAME}" )
-endif(UNIX)
-
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${TEST_BIN_NAME})
+add_test(Run_test_iibmalloc test_iibmalloc)

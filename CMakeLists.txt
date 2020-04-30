@@ -3,7 +3,7 @@
 #-------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.0)
 project(iibmalloc CXX)
-set(CMAKE_CXX_STANDARD 17)
+
 include(CTest)
 
 set (CMAKE_MODULE_PATH 

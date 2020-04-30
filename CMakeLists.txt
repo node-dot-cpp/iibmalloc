@@ -6,26 +6,10 @@ project(iibmalloc CXX)
 set(CMAKE_CXX_STANDARD 17)
 include(CTest)
 
-#-------------------------------------------------------------------------------------------
-# Defines
-#-------------------------------------------------------------------------------------------
+set (CMAKE_MODULE_PATH 
+  "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/src/foundation/tools")
+include(CommonCppFlags)
 
-if(MSVC)
-	add_compile_options(/W3)
-	add_compile_options(/EHa)
-#	add_compile_options(/MD)
-else()
-	add_compile_options( -Wall )
-	add_compile_options( -Wextra )
-	add_compile_options( -Wno-unused-variable )
-	add_compile_options( -Wno-unused-parameter )
-	add_compile_options( -Wno-empty-body )
-	add_compile_options(-fexceptions)
-	add_compile_options(-lto )
-	add_compile_options(-fnon-call-exceptions)
-#	add_compile_options(-lpthread)
-	add_compile_options(-O2)
-endif()
 
 #-------------------------------------------------------------------------------------------
 # Library definition

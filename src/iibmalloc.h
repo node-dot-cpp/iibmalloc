@@ -702,7 +702,7 @@ public:
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev->prevInBlock() == nullptr || !prev->prevInBlock()->isFree() );
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, prev->nextInBlock() == h );
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<uint8_t*>(prev->prevInBlock()) + (prev->prevInBlock()->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( h ) );
-				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(prev) );
+				removeFromFreeList( static_cast<FreeChunkHeader*>(prev) );
 				prev->set( prev->prevInBlock(), h->nextInBlock(), prev->getPageCount() + h->getPageCount(), true );
 				h = prev;
 			}
@@ -712,11 +712,11 @@ public:
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->nextInBlock() == nullptr || !next->nextInBlock()->isFree() );
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->prevInBlock() == h );
 				NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, reinterpret_cast<uint8_t*>(h) + (h->getPageCount() << PAGE_SIZE_EXP) == reinterpret_cast<uint8_t*>( next ) );
-				removeFromFreeList( reinterpret_cast<FreeChunkHeader*>(next) );
+				removeFromFreeList( static_cast<FreeChunkHeader*>(next) );
 				h->set( h->prevInBlock(), next->nextInBlock(), h->getPageCount() + next->getPageCount(), true );
 			}
 
-			FreeChunkHeader* hfree = reinterpret_cast<FreeChunkHeader*>(h);
+			FreeChunkHeader* hfree = static_cast<FreeChunkHeader*>(h);
 			uint16_t idx = hfree->getPageCount() - 1;
 			if ( idx >= max_pages )
 				idx = max_pages;

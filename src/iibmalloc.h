@@ -53,11 +53,11 @@ static_assert( ( 1 << ALIGNMENT_EXP ) == ALIGNMENT, "" );
 constexpr size_t ALIGNMENT_MASK = expToMask(ALIGNMENT_EXP);
 static_assert( 1 + ALIGNMENT_MASK == ALIGNMENT, "" );
 
-constexpr size_t PAGE_SIZE = 4 * 1024;
-constexpr uint8_t PAGE_SIZE_EXP = sizeToExp(PAGE_SIZE);
+constexpr size_t PAGE_SIZE_BYTES = 4 * 1024;
+constexpr uint8_t PAGE_SIZE_EXP = sizeToExp(PAGE_SIZE_BYTES);
 constexpr size_t PAGE_SIZE_MASK = expToMask(PAGE_SIZE_EXP);
-static_assert( ( 1 << PAGE_SIZE_EXP ) == PAGE_SIZE, "" );
-static_assert( 1 + PAGE_SIZE_MASK == PAGE_SIZE, "" );
+static_assert( ( 1 << PAGE_SIZE_EXP ) == PAGE_SIZE_BYTES, "" );
+static_assert( 1 + PAGE_SIZE_MASK == PAGE_SIZE_BYTES, "" );
 
 
 template<class BasePageAllocator, class ItemT>
@@ -99,10 +99,10 @@ public:
 	{
 		if ( freeList == nullptr )
 		{
-			freeList = reinterpret_cast<ListItem*>( this->getFreeBlockNoCache( PAGE_SIZE ) );
+			freeList = reinterpret_cast<ListItem*>( this->getFreeBlockNoCache( PAGE_SIZE_BYTES ) );
 			++pageCnt;
 			ListItem* item = freeList;
-			size_t itemCnt = PAGE_SIZE / sizeof( ListItem );
+			size_t itemCnt = PAGE_SIZE_BYTES / sizeof( ListItem );
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, itemCnt != 0 );
 			for ( size_t i=0; i<itemCnt-1; ++i )
 			{
@@ -139,7 +139,7 @@ public:
 		while (pageStartHead)
 		{
 			ListItem* tmp = pageStartHead->next;
-			this->freeChunkNoCache( pageStartHead, PAGE_SIZE );
+			this->freeChunkNoCache( pageStartHead, PAGE_SIZE_BYTES );
 			--pageCnt;
 			pageStartHead = tmp;
 		}
@@ -205,8 +205,8 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 //		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx );
 		void* ret = idxToPageAddr( pb->blockAddress, reasonIdx, 0 );
 //	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "createNextBlockAndGetPage(): before commit, {}, 0x{:x} -> 0x{:x}", reasonIdx, (size_t)(pb->blockAddress), (size_t)(ret) );
-//		void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
-//		this->CommitMemory( ret, PAGE_SIZE );
+//		void* ret2 = this->CommitMemory( ret, PAGE_SIZE_BYTES );
+//		this->CommitMemory( ret, PAGE_SIZE_BYTES );
 		commitRangeOfPageIndexes( pb->blockAddress, reasonIdx, 0, commit_page_cnt );
 		pb->nextToUse[ reasonIdx ] = 1;
 		static_assert( commit_page_cnt <= UINT16_MAX, "" );
@@ -285,19 +285,19 @@ public:
 		for ( size_t i=1; i<rangeSize; ++i )
 		{
 			next = reinterpret_cast<uint8_t*>( idxToPageAddr( blockptr, bucketIdx, pageIdx + i ) );
-			if ( next - prevNext == PAGE_SIZE )
+			if ( next - prevNext == PAGE_SIZE_BYTES )
 			{
 				prevNext = next;
 				continue;
 			}
 			else
 			{
-				this->CommitMemory( start, prevNext - start + PAGE_SIZE );
+				this->CommitMemory( start, prevNext - start + PAGE_SIZE_BYTES );
 				start = next;
 				prevNext = next;
 			}
 		}
-		this->CommitMemory( start, prevNext - start + PAGE_SIZE );
+		this->CommitMemory( start, prevNext - start + PAGE_SIZE_BYTES );
 	}
 
 	void* getPage( size_t idx )
@@ -315,7 +315,7 @@ public:
 			void* ret = idxToPageAddr( indexHead[idx]->blockAddress, idx, indexHead[idx]->nextToUse[idx] );
 			++(indexHead[idx]->nextToUse[idx]);
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
-//			this->CommitMemory( ret, PAGE_SIZE );
+//			this->CommitMemory( ret, PAGE_SIZE_BYTES );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
@@ -344,9 +344,9 @@ public:
 			indexHead[idx]->nextToUse[idx] = 1;
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, indexHead[idx]->nextToUse[idx] <= indexHead[idx]->nextToCommit[idx] );
 //	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "getPage(): before commit, {}, 0x{:x} -> 0x{:x}", idx, (size_t)(indexHead[idx]->blockAddress), (size_t)(ret) );
-//			void* ret2 = this->CommitMemory( ret, PAGE_SIZE );
+//			void* ret2 = this->CommitMemory( ret, PAGE_SIZE_BYTES );
 //	nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "getPage(): after commit 0x{:x}", (size_t)(ret2) );
-//			this->CommitMemory( ret, PAGE_SIZE );
+//			this->CommitMemory( ret, PAGE_SIZE_BYTES );
 *reinterpret_cast<uint8_t*>(ret) += 1; // test write
 			return ret;
 		}
@@ -361,7 +361,7 @@ public:
 		if constexpr ( multipage_page_cnt == 1 )
 		{
 			asserrt( mpData.ptr1 );
-			mpData.sz1 = PAGE_SIZE;
+			mpData.sz1 = PAGE_SIZE_BYTES;
 			mpData.ptr2 = nullptr;
 			mpData.sz2 = 0;
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, mpData.sz1 + mpData.sz2 == ( multipage_page_cnt << PAGE_SIZE_EXP ) );
@@ -370,13 +370,13 @@ public:
 
 		void* nextPage;
 		size_t i=1;
-		mpData.sz1 = PAGE_SIZE;
+		mpData.sz1 = PAGE_SIZE_BYTES;
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr1) + mpData.sz1 == reinterpret_cast<uint8_t*>(nextPage) )
-				mpData.sz1 += PAGE_SIZE;
+				mpData.sz1 += PAGE_SIZE_BYTES;
 			else break;
 		}
 		if ( i == multipage_page_cnt )
@@ -387,14 +387,14 @@ public:
 			return;
 		}
 		mpData.ptr2 = nextPage;
-		mpData.sz2 = PAGE_SIZE;
+		mpData.sz2 = PAGE_SIZE_BYTES;
 		++i;
 		for ( ; i<multipage_page_cnt; ++i )
 		{
 			nextPage = getPage( idx );
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, nextPage );
 			if ( reinterpret_cast<uint8_t*>(mpData.ptr2) + mpData.sz2 == reinterpret_cast<uint8_t*>(nextPage) )
-				mpData.sz2 += PAGE_SIZE;
+				mpData.sz2 += PAGE_SIZE_BYTES;
 			else break;
 		}
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, i == multipage_page_cnt );
@@ -412,7 +412,7 @@ public:
 		PageBlockDescriptor* next = pageBlockListStart.next;
 		while( next )
 		{
-//nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "in block 0x{:x} about to delete 0x{:x} of size 0x{:x}", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE * bucket_cnt );
+//nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "in block 0x{:x} about to delete 0x{:x} of size 0x{:x}", (size_t)( next ), (size_t)( next->blockAddress ), PAGE_SIZE_BYTES * bucket_cnt );
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, next->blockAddress );
 			this->freeChunkNoCache( reinterpret_cast<MemoryBlockListItem*>( next->blockAddress ), reservation_size );
 			PageBlockDescriptor* tmp = next->next;
@@ -435,7 +435,7 @@ class BulkAllocator : public BasePageAllocator
 {
 	static_assert( ( commited_block_size >> PAGE_SIZE_EXP ) > 0 );
 	static_assert( ( commited_block_size & PAGE_SIZE_MASK ) == 0 );
-	static_assert( max_pages < PAGE_SIZE );
+	static_assert( max_pages < PAGE_SIZE_BYTES );
 	static constexpr size_t pagesPerAllocatedBlock = commited_block_size >> PAGE_SIZE_EXP;
 
 public:
@@ -781,7 +781,7 @@ public:
 class IibAllocatorBase
 {
 protected:
-	static constexpr size_t MaxBucketSize = PAGE_SIZE * 2;
+	static constexpr size_t MaxBucketSize = PAGE_SIZE_BYTES * 2;
 	static constexpr size_t BucketCountExp = 6;
 	static constexpr size_t BucketCount = 1 << BucketCountExp;
 	void* buckets[BucketCount];
@@ -962,7 +962,7 @@ public:
 			return false;
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( ((uintptr_t)block) & PAGE_SIZE_MASK ) == 0 );
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( blockSz & PAGE_SIZE_MASK ) == 0 );
-		if( ( bucketSz & (memForbidden*2-1) ) == 0 ) // that is, (K * bucketSz) % PAGE_SIZE != memForbidden for any K
+		if( ( bucketSz & (memForbidden*2-1) ) == 0 ) // that is, (K * bucketSz) % PAGE_SIZE_BYTES != memForbidden for any K
 		{
 			size_t itemCnt = blockSz / bucketSz;
 			if ( itemCnt )

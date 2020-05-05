@@ -37,17 +37,20 @@
 #include <stdint.h>
 #include <assert.h>
 
-#ifdef NODECPP_MSVC
+#if defined NODECPP_WINDOWS
 #include <Windows.h>
-#else
+#elif defined NODECPP_LINUX
 #include <time.h>
+#elif defined NODECPP_MAC
+#include <mach/clock.h>
+#include <mach/mach.h>
 #endif
 
 
 int64_t GetMicrosecondCount()
 {
 	int64_t now = 0;
-#ifdef NODECPP_MSVC
+#ifdef NODECPP_WINDOWS
 	static int64_t frec = 0;
 	if (frec == 0)
 	{
@@ -65,12 +68,12 @@ int64_t GetMicrosecondCount()
 }
 
 
-
+#if defined NODECPP_WINDOWS
 NODECPP_NOINLINE
 size_t GetMillisecondCount()
 {
     size_t now;
-#ifdef NODECPP_MSVC
+
 	static uint64_t frec = 0;
 	if (frec == 0)
 	{
@@ -83,8 +86,15 @@ size_t GetMillisecondCount()
 	BOOL ok = QueryPerformanceCounter(&val);
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ok);
 	now = val.QuadPart / frec;
-	
-#else
+    return now;
+}
+
+#elif defined NODECPP_LINUX
+NODECPP_NOINLINE
+size_t GetMillisecondCount()
+{
+    size_t now;
+
 #if 1
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);//clock get time monotonic
@@ -96,6 +106,26 @@ size_t GetMillisecondCount()
     now *= 1000;
     now += now_.tv_usec / 1000000;
 #endif
-#endif
     return now;
 }
+
+#elif defined NODECPP_MAC
+NODECPP_NOINLINE
+size_t GetMillisecondCount()
+{
+    size_t now;
+
+	clock_serv_t cclock;
+	mach_timespec_t mts;
+	host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+	clock_get_time(cclock, &mts);
+	mach_port_deallocate(mach_task_self(), cclock);
+    now = (uint64_t)mts.tv_sec * 1000 + mts.tv_nsec / 1000000; // mks
+    return now;
+}
+
+#else // other OSs
+
+#error unknown/unsupported OS
+
+#endif

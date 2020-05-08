@@ -294,7 +294,7 @@ public:
 	void freeChunk( MemoryBlockListItem* chk )
 	{
 		size_t ix = chk->getSizeIndex();
-		assert ( ix == 0 );
+		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ix == 0 );
 
 		size_t sz = chk->getSize();
 		stats.registerDeallocRequest( sz );

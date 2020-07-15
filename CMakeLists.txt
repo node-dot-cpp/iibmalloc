@@ -6,8 +6,9 @@ project(iibmalloc CXX)
 
 include(CTest)
 
-set (CMAKE_MODULE_PATH 
-  "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/src/foundation/tools")
+set(CMAKE_CXX_STANDARD 17)
+
+set (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/src/foundation/tools")
 include(CommonCppFlags)
 
 
@@ -18,20 +19,19 @@ add_library(iibmalloc STATIC
   src/iibmalloc.cpp
   )
 
-#-------------------------------------------------------------------------------------------
-# Export Include Directories
-#-------------------------------------------------------------------------------------------
 target_include_directories(iibmalloc
   PUBLIC include
   PUBLIC src
   )
 
-#-------------------------------------------------------------------------------------------
-# Package Dependencies 
-#-------------------------------------------------------------------------------------------
 add_subdirectory(src/foundation)
 
 target_link_libraries(iibmalloc foundation)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	# we need async exceptions
+	string( REPLACE "/EHsc" "/EHa" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" )
+endif()
 
 #-------------------------------------------------------------------------------------------
 # Tests 

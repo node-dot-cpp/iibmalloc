@@ -463,7 +463,7 @@ public:
 	};
 
 	constexpr size_t maxAllocatableSize() {return ((size_t)max_pages) << PAGE_SIZE_EXP; }
-	static constexpr size_t reservedSizeAtPageStart() { return sizeof( AnyChunkHeader ); }
+	static constexpr size_t reservedSizeAtPageStart() { return std::max( sizeof( AnyChunkHeader ), (size_t)(NODECPP_GUARANTEED_IIBMALLOC_ALIGNMENT) ); }
 
 private:
 //	std::vector<AnyChunkHeader*> blockList;

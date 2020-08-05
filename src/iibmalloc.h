@@ -1063,6 +1063,61 @@ public:
 		return nullptr;
 	}
 
+	template<size_t sizeLowBound, size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
+	{
+		static_assert( sizeLowBound >= alignment );
+		void* ret = nullptr;
+#ifdef USE_EXP_BUCKET_SIZES
+		ret = allocate( sz );
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+		if constexpr ( alignment <= 8 ) 
+			ret = allocate( sz );
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, sz >= sizeLowBound, "{} vs. {}", sz, sizeLowBound );
+		if constexpr ( sizeLowBound > 16 && sizeLowBound <= 24 )
+			ret = allocate( sz > 24 ? sz : 25 );
+		else if constexpr ( alignment <= 16 ) 
+			ret = allocate( sz );
+		else if constexpr ( sizeLowBound > 33 && sizeLowBound <= 48 )
+			ret = allocate( sz > 48 ? sz : 49 );
+		else
+			ret = allocate( sz );
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+#error Not implemented
+#else
+#error Undefined bucket size schema
+#endif
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ((uintptr_t)ret & (alignment - 1)) == 0, "ret = 0x{:x}, alignment = {}", (uintptr_t)ret, alignment );
+		return ret;
+	}
+
+	template<size_t sz, size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned()
+	{
+		static_assert( sz >= alignment );
+		void* ret = nullptr;
+#ifdef USE_EXP_BUCKET_SIZES
+		ret = allocate( sz );
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+		if constexpr ( alignment <= 8 ) 
+			ret = allocate( sz );
+		if constexpr ( sz > 16 && sz <= 24 )
+			ret = allocate( 32 );
+		else if constexpr ( alignment <= 16 ) 
+			ret = allocate( sz );
+		else if constexpr ( sz > 33 && sz <= 48 )
+			ret = allocate( 64 );
+		else
+			ret = allocate( sz );
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+#error Not implemented
+#else
+#error Undefined bucket size schema
+#endif
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ((uintptr_t)ret & (alignment - 1)) == 0, "ret = 0x{:x}, alignment = {}", (uintptr_t)ret, alignment );
+		return ret;
+	}
+
 	NODECPP_FORCEINLINE void deallocate(void* ptr)
 	{
 		if(ptr)
@@ -1189,6 +1244,18 @@ public:
 		return IibAllocatorBase::allocate( sz );
 	}
 
+	template<size_t sizeLowBound, size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
+	{
+		return IibAllocatorBase::allocateAligned<sizeLowBound, alignment>( sz );
+	}
+
+	template<size_t sz, size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned()
+	{
+		return IibAllocatorBase::allocateAligned<sz, alignment>();
+	}
+
 	NODECPP_FORCEINLINE void deallocate(void* ptr )
 	{
 		IibAllocatorBase::deallocate( ptr );
@@ -1202,6 +1269,20 @@ public:
 	NODECPP_FORCEINLINE void* zombieableAllocate(size_t sz)
 	{
 		void* ret = IibAllocatorBase::allocate( sz + guaranteed_prefix_size );
+		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
+	}
+
+	template<size_t sizeLowBound, size_t alignment>
+	NODECPP_FORCEINLINE void* zombieableAllocateAligned(size_t sz)
+	{
+		void* ret = IibAllocatorBase::allocateAligned<sizeLowBound + guaranteed_prefix_size, alignment>( sz + guaranteed_prefix_size );
+		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
+	}
+
+	template<size_t sz, size_t alignment>
+	NODECPP_FORCEINLINE void* zombieableAllocateAligned()
+	{
+		void* ret = IibAllocatorBase::allocateAligned<sz + guaranteed_prefix_size, alignment>();
 		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
 	}
 

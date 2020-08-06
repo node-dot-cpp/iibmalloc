@@ -1298,6 +1298,7 @@ public:
 	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
 	SafeIibAllocator& operator=(SafeIibAllocator&&) = default;
 
+	using IibAllocatorBase::maximalSupportedAlignment;
 //	void enable() {}
 //	void disable() {}
 

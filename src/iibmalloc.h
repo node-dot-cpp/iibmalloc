@@ -1172,18 +1172,18 @@ public:
 		static_assert( sz >= alignment );
 		void* ret = nullptr;
 #ifdef USE_EXP_BUCKET_SIZES
-		ret = allocate< sz >;
+		ret = allocate< sz >();
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 		if constexpr ( alignment <= 8 ) 
-			ret = allocate< sz >;
+			ret = allocate< sz >();
 		if constexpr ( sz > 16 && sz <= 24 )
 			ret = allocate< 32 >;
 		else if constexpr ( alignment <= 16 ) 
-			ret = allocate< sz >;
+			ret = allocate< sz >();
 		else if constexpr ( sz > 33 && sz <= 48 )
 			ret = allocate< 64 >;
 		else
-			ret = allocate< sz >;
+			ret = allocate< sz >();
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 #error Not implemented
 #else

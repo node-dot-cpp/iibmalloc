@@ -820,6 +820,14 @@ public:
 #error "Undefined bucket size schema"
 #endif
 
+template<uint64_t n>
+static NODECPP_FORCEINLINE constexpr unsigned long UpperNonZeroBitPos() {
+	static_assert( n != 0 );
+	unsigned long bitpos = 63;
+	while ( bitpos && ( n & ((uint64_t)1) << bitpos) == 0 ) { --bitpos; }
+	return bitpos;
+}
+
 #if defined NODECPP_MSVC
 #if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
@@ -846,6 +854,15 @@ public:
 		uint8_t r = _BitScanReverse64(&ix, sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(ix - 2);
 	}
+	template<uint64_t sz>
+	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexConstexpr()
+	{
+		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+		if constexpr ( sz <= 8 )
+			return 0;
+		else
+			return ix - 2;
+	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
 	NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
@@ -853,12 +870,22 @@ public:
 		if ( sz <= 8 )
 			return 0;
 		sz -= 1;
-		unsigned long ix;
+		unsigned long ix = 0;
 		uint8_t r = _BitScanReverse64(&ix, sz);
 //		nodecpp::log::default_log::info( nodecpp::log::ModuleID(nodecpp::iibmalloc_module_id), "ix = {}", ix );
 		uint8_t addition = 1 & ( sz >> (ix-1) );
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
+	}
+	template<uint64_t sz>
+	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexHalfExpConstexpr()
+	{
+		if constexpr ( sz <= 8 )
+			return 0;
+		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+		constexpr uint8_t addition = 1 & ( sz >> (ix-1) );
+		constexpr unsigned long ix1 = ((ix-2)<<1) + addition - 1;
+		return static_cast<uint8_t>(ix1);
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
@@ -873,6 +900,16 @@ public:
 		uint8_t addition = 3 & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);
+	}
+	template<uint64_t sz>
+	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
+	{
+		if constexpr ( sz <= 8 )
+			return 0;
+		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+		constexpr uint8_t addition = 3 & ( sz >> (ix-2) );
+		constexpr ix1 = ((ix-2)<<2) + addition - 3;
+		return static_cast<uint8_t>(ix1);
 	}
 #else
 #error Undefined bucket size schema
@@ -955,7 +992,7 @@ public:
 	IibAllocatorBase& operator=(const IibAllocatorBase&) = delete;
 	IibAllocatorBase& operator=(IibAllocatorBase&&) = default;
 
-	static constexpr size_t maximalSupportedAlignment = std::max( 32, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+	static constexpr size_t maximalSupportedAlignment = 32 > NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW ? 32 : NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW;
 
 	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
 	{
@@ -1065,33 +1102,34 @@ public:
 		return nullptr;
 	}
 
-	template<size_t sizeLowBound, size_t alignment>
-	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
+	template<size_t sz>
+	NODECPP_FORCEINLINE void* allocate()
 	{
-		static_assert( alignment <= maximalSupportedAlignment );
-		static_assert( sizeLowBound >= alignment );
-		void* ret = nullptr;
+		if constexpr ( sz <= MaxBucketSize )
+		{
 #ifdef USE_EXP_BUCKET_SIZES
-		ret = allocate( sz );
+			constexpr uint8_t szidx = sizeToIndexConstexpr< sz >();
 #elif defined USE_HALF_EXP_BUCKET_SIZES
-		if constexpr ( alignment <= 8 ) 
-			ret = allocate( sz );
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, sz >= sizeLowBound, "{} vs. {}", sz, sizeLowBound );
-		if constexpr ( sizeLowBound > 16 && sizeLowBound <= 24 )
-			ret = allocate( sz > 24 ? sz : 25 );
-		else if constexpr ( alignment <= 16 ) 
-			ret = allocate( sz );
-		else if constexpr ( sizeLowBound > 33 && sizeLowBound <= 48 )
-			ret = allocate( sz > 48 ? sz : 49 );
-		else
-			ret = allocate( sz );
+			constexpr uint8_t szidx = sizeToIndexHalfExpConstexpr< sz >();
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
-#error Not implemented
+			constexpr uint8_t szidx = sizeToIndexQuarterExpConstexpr< sz >();
 #else
 #error Undefined bucket size schema
 #endif
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ((uintptr_t)ret & (alignment - 1)) == 0, "ret = 0x{:x}, alignment = {}", (uintptr_t)ret, alignment );
-		return ret;
+			static_assert( szidx < BucketCount );
+			if ( buckets[szidx] )
+			{
+				void* ret = buckets[szidx];
+				buckets[szidx] = *reinterpret_cast<void**>(buckets[szidx]);
+				return ret;
+			}
+			else
+				return allocateInCaseNoFreeBucket( sz, szidx );
+		}
+		else
+			return allocateInCaseTooLargeForBucket( sz );
+
+		return nullptr;
 	}
 
 	template<size_t alignment>
@@ -1100,17 +1138,24 @@ public:
 		static_assert( alignment <= maximalSupportedAlignment );
 		void* ret = nullptr;
 #ifdef USE_EXP_BUCKET_SIZES
-		if constexpr ( alignment <= 8 ) 
-			ret = allocate( sz );
-		else
-			ret = allocate( sz >= alignment ? sz : alignment );
+		ret = allocate( sz );
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 		if constexpr ( alignment <= 8 ) 
 			ret = allocate( sz );
 		else if constexpr ( alignment == 16 ) 
-			ret = allocate( sz > 24 ? sz : 25 );
+		{
+			if ( sz > 24 )
+				ret = allocate( sz );
+			else
+				ret = allocate<25>();
+		}
 		else if constexpr ( alignment == 32 ) 
-			ret = allocate( sz > 48 ? sz : 49 );
+		{
+			if ( sz > 48 )
+				ret = allocate( sz );
+			else
+				ret = allocate<49>();
+		}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 #error Not implemented
 #else
@@ -1127,18 +1172,18 @@ public:
 		static_assert( sz >= alignment );
 		void* ret = nullptr;
 #ifdef USE_EXP_BUCKET_SIZES
-		ret = allocate( sz );
+		ret = allocate< sz >;
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 		if constexpr ( alignment <= 8 ) 
-			ret = allocate( sz );
+			ret = allocate< sz >;
 		if constexpr ( sz > 16 && sz <= 24 )
-			ret = allocate( 32 );
+			ret = allocate< 32 >;
 		else if constexpr ( alignment <= 16 ) 
-			ret = allocate( sz );
+			ret = allocate< sz >;
 		else if constexpr ( sz > 33 && sz <= 48 )
-			ret = allocate( 64 );
+			ret = allocate< 64 >;
 		else
-			ret = allocate( sz );
+			ret = allocate< sz >;
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 #error Not implemented
 #else
@@ -1274,12 +1319,6 @@ public:
 		return IibAllocatorBase::allocate( sz );
 	}
 
-	template<size_t sizeLowBound, size_t alignment>
-	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
-	{
-		return IibAllocatorBase::allocateAligned<sizeLowBound, alignment>( sz );
-	}
-
 	template<size_t alignment>
 	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
 	{
@@ -1305,13 +1344,6 @@ public:
 	NODECPP_FORCEINLINE void* zombieableAllocate(size_t sz)
 	{
 		void* ret = IibAllocatorBase::allocate( sz + guaranteed_prefix_size );
-		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
-	}
-
-	template<size_t sizeLowBound, size_t alignment>
-	NODECPP_FORCEINLINE void* zombieableAllocateAligned(size_t sz)
-	{
-		void* ret = IibAllocatorBase::allocateAligned<sizeLowBound + guaranteed_prefix_size, alignment>( sz + guaranteed_prefix_size );
 		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
 	}
 

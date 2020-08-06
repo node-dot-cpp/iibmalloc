@@ -219,6 +219,11 @@ void alignedAllocTest()
 		alignas(32) uint8_t basemem[ 72 ];
 		uintptr_t dummy;
 	};
+	struct LargeAndAlignedMaxNew
+	{
+		alignas(NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW) uint8_t basemem[ 40 ];
+		uintptr_t dummy;
+	};
 
 	g_AllocManager.initialize();
 	void* ptrs[testCnt];
@@ -257,12 +262,12 @@ void alignedAllocTest()
 
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		ptrs[i] = new LargeAndAligned;
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & (alignof(LargeAndAligned) - 1 ) ) == 0 );
+		ptrs[i] = new LargeAndAlignedMaxNew;
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & (alignof(LargeAndAlignedMaxNew) - 1 ) ) == 0 );
 	}
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		delete (LargeAndAligned*)(ptrs[i]);
+		delete (LargeAndAlignedMaxNew*)(ptrs[i]);
 	}
 
 	// new/delete interception (with iibmalloc)

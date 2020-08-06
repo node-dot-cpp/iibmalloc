@@ -211,11 +211,93 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 	params.startupParams.allocatorType = allocatorType; // restore
 }
 
+void alignedAllocTest()
+{
+	static constexpr size_t testCnt = 0x400;
+	struct LargeAndAligned
+	{
+		alignas(32) uint8_t basemem[ 72 ];
+		uintptr_t dummy;
+	};
+
+	g_AllocManager.initialize();
+	void* ptrs[testCnt];
+
+	// direct usage
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = g_AllocManager.allocateAligned<38,32>(47);
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 31 ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		g_AllocManager.deallocate(ptrs[i]);
+	}
+
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = g_AllocManager.allocateAligned<22,16>(22);
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 15 ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		g_AllocManager.deallocate(ptrs[i]);
+	}
+
+	// new/delete interception (no iiballoc)
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = new char [7];
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 15 ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		delete [] ptrs[i];
+	}
+
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = new LargeAndAligned;
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & (alignof(LargeAndAligned) - 1 ) ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		delete (LargeAndAligned*)(ptrs[i]);
+	}
+
+	// new/delete interception (with iibmalloc)
+	ThreadLocalAllocatorT* former = interceptNewDeleteOperators( &g_AllocManager );
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = new char [7];
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 15 ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		delete [] ptrs[i];
+	}
+
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		ptrs[i] = new LargeAndAligned;
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & (alignof(LargeAndAligned) - 1 ) ) == 0 );
+	}
+	for ( size_t i=0; i<testCnt; ++i )
+	{
+		delete (LargeAndAligned*)(ptrs[i]);
+	}
+
+	interceptNewDeleteOperators( former );
+	g_AllocManager.deinitialize();
+}
+
 int main()
 {
 	nodecpp::log::Log log;
 	log.level = nodecpp::log::LogLevel::info;
 	log.add( stdout );
+
+	alignedAllocTest(); return 0;
 
 	TestRes testRes[max_threads];
 

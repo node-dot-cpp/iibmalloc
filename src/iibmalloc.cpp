@@ -31,7 +31,8 @@
  * 
  * -------------------------------------------------------------------------------*/
 
-
+#include <platform_base.h>
+#include <nodecpp_assert.h>
 #include "iibmalloc.h"
 
 namespace nodecpp::iibmalloc
@@ -51,9 +52,12 @@ namespace nodecpp::iibmalloc
 }
 
 #else // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+
 // We need it as a workaround because of P0302R0
 //    http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0302r0.html
 // if we want lambda-related allocations to be done with a specific allocator
+
+#include <malloc_based_allocator.h>
 
 namespace nodecpp::iibmalloc
 {
@@ -69,7 +73,7 @@ void* operator new(std::size_t count)
 {
 	if ( g_CurrentAllocManager )
 	{
-		void* ret = g_CurrentAllocManager->allocate(count);
+		void* ret = g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
 		return ret;
 	}
 	else
@@ -79,12 +83,44 @@ void* operator new(std::size_t count)
 	}
 }
 
+void* operator new(std::size_t count, std::align_val_t al)
+{
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+	void* ret;
+	if ( g_CurrentAllocManager )
+	{
+		ret = g_CurrentAllocManager->allocateAligned<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
+	}
+	else
+	{
+		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
+	}
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
+	return ret;
+}
+
 void* operator new[](std::size_t count)
 {
 	if ( g_CurrentAllocManager )
-		return g_CurrentAllocManager->allocate(count);
+		return g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
 	else
 		return malloc(count);
+}
+
+void* operator new[](std::size_t count, std::align_val_t al)
+{
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+	void* ret;
+	if ( g_CurrentAllocManager )
+	{
+		ret = g_CurrentAllocManager->allocateAligned<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
+	}
+	else
+	{
+		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
+	}
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
+	return ret;
 }
 
 void operator delete(void* ptr) noexcept
@@ -95,12 +131,30 @@ void operator delete(void* ptr) noexcept
 		free(ptr);
 }
 
+void operator delete(void* ptr, std::align_val_t al) noexcept
+{
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
+	else
+		nodecpp::StdRawAllocator::deallocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(ptr);
+}
+
 void operator delete[](void* ptr) noexcept
 {
 	if ( g_CurrentAllocManager )
 		g_CurrentAllocManager->deallocate(ptr);
 	else
 		free(ptr);
+}
+
+void operator delete[](void* ptr, std::align_val_t al) noexcept
+{
+	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+	if ( g_CurrentAllocManager )
+		g_CurrentAllocManager->deallocate(ptr);
+	else
+		nodecpp::StdRawAllocator::deallocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(ptr);
 }
 #endif // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 

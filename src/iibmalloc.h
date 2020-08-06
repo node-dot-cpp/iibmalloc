@@ -955,6 +955,8 @@ public:
 	IibAllocatorBase& operator=(const IibAllocatorBase&) = delete;
 	IibAllocatorBase& operator=(IibAllocatorBase&&) = default;
 
+	static constexpr size_t maximalSupportedAlignment = std::max( 32, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+
 	bool formatAllocatedPageAlignedBlock( uint8_t* block, size_t blockSz, size_t bucketSz, uint8_t bucketidx )
 	{
 		constexpr size_t memForbidden = alignUpExp( BulkAllocatorT::reservedSizeAtPageStart(), ALIGNMENT_EXP );
@@ -1066,6 +1068,7 @@ public:
 	template<size_t sizeLowBound, size_t alignment>
 	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
 	{
+		static_assert( alignment <= maximalSupportedAlignment );
 		static_assert( sizeLowBound >= alignment );
 		void* ret = nullptr;
 #ifdef USE_EXP_BUCKET_SIZES
@@ -1091,9 +1094,36 @@ public:
 		return ret;
 	}
 
+	template<size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
+	{
+		static_assert( alignment <= maximalSupportedAlignment );
+		void* ret = nullptr;
+#ifdef USE_EXP_BUCKET_SIZES
+		if constexpr ( alignment <= 8 ) 
+			ret = allocate( sz );
+		else
+			ret = allocate( sz >= alignment ? sz : alignment );
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+		if constexpr ( alignment <= 8 ) 
+			ret = allocate( sz );
+		else if constexpr ( alignment == 16 ) 
+			ret = allocate( sz > 24 ? sz : 25 );
+		else if constexpr ( alignment == 32 ) 
+			ret = allocate( sz > 48 ? sz : 49 );
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+#error Not implemented
+#else
+#error Undefined bucket size schema
+#endif
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ((uintptr_t)ret & (alignment - 1)) == 0, "ret = 0x{:x}, alignment = {}", (uintptr_t)ret, alignment );
+		return ret;
+	}
+
 	template<size_t sz, size_t alignment>
 	NODECPP_FORCEINLINE void* allocateAligned()
 	{
+		static_assert( alignment <= maximalSupportedAlignment );
 		static_assert( sz >= alignment );
 		void* ret = nullptr;
 #ifdef USE_EXP_BUCKET_SIZES
@@ -1250,6 +1280,12 @@ public:
 		return IibAllocatorBase::allocateAligned<sizeLowBound, alignment>( sz );
 	}
 
+	template<size_t alignment>
+	NODECPP_FORCEINLINE void* allocateAligned(size_t sz)
+	{
+		return IibAllocatorBase::allocateAligned<alignment>( sz );
+	}
+
 	template<size_t sz, size_t alignment>
 	NODECPP_FORCEINLINE void* allocateAligned()
 	{
@@ -1276,6 +1312,13 @@ public:
 	NODECPP_FORCEINLINE void* zombieableAllocateAligned(size_t sz)
 	{
 		void* ret = IibAllocatorBase::allocateAligned<sizeLowBound + guaranteed_prefix_size, alignment>( sz + guaranteed_prefix_size );
+		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
+	}
+
+	template<size_t alignment>
+	NODECPP_FORCEINLINE void* zombieableAllocateAligned(size_t sz)
+	{
+		void* ret = IibAllocatorBase::allocateAligned<alignment>( sz + guaranteed_prefix_size );
 		return reinterpret_cast<uint8_t*>(ret) + guaranteed_prefix_size;
 	}
 

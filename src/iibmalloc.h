@@ -828,6 +828,39 @@ static NODECPP_FORCEINLINE constexpr unsigned long UpperNonZeroBitPos() {
 	return bitpos;
 }
 
+template<uint64_t sz>
+static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexConstexpr()
+{
+	constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+	if constexpr ( sz <= 8 )
+		return 0;
+	else
+		return ix - 2;
+}
+
+template<uint64_t sz>
+static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexHalfExpConstexpr()
+{
+	if constexpr ( sz <= 8 )
+		return 0;
+	constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+	constexpr uint8_t addition = 1 & ( sz >> (ix-1) );
+	constexpr unsigned long ix1 = ((ix-2)<<1) + addition - 1;
+	return static_cast<uint8_t>(ix1);
+}
+
+template<uint64_t sz>
+static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
+{
+	if constexpr ( sz <= 8 )
+		return 0;
+	constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+	constexpr uint8_t addition = 3 & ( sz >> (ix-2) );
+	constexpr unsigned long ix1 = ((ix-2)<<2) + addition - 3;
+	return static_cast<uint8_t>(ix1);
+}
+
+
 #if defined NODECPP_MSVC
 #if defined NODECPP_X86
 #ifdef USE_EXP_BUCKET_SIZES
@@ -854,15 +887,6 @@ static NODECPP_FORCEINLINE constexpr unsigned long UpperNonZeroBitPos() {
 		uint8_t r = _BitScanReverse64(&ix, sz - 1);
 		return (sz <= 8) ? 0 : static_cast<uint8_t>(ix - 2);
 	}
-	template<uint64_t sz>
-	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexConstexpr()
-	{
-		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
-		if constexpr ( sz <= 8 )
-			return 0;
-		else
-			return ix - 2;
-	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static
 	NODECPP_FORCEINLINE uint8_t sizeToIndexHalfExp(uint64_t sz)
@@ -877,16 +901,6 @@ static NODECPP_FORCEINLINE constexpr unsigned long UpperNonZeroBitPos() {
 		ix = ((ix-2)<<1) + addition - 1;
 		return static_cast<uint8_t>(ix);
 	}
-	template<uint64_t sz>
-	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexHalfExpConstexpr()
-	{
-		if constexpr ( sz <= 8 )
-			return 0;
-		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
-		constexpr uint8_t addition = 1 & ( sz >> (ix-1) );
-		constexpr unsigned long ix1 = ((ix-2)<<1) + addition - 1;
-		return static_cast<uint8_t>(ix1);
-	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static
 	NODECPP_FORCEINLINE uint8_t sizeToIndexQuarterExp(uint64_t sz)
@@ -900,16 +914,6 @@ static NODECPP_FORCEINLINE constexpr unsigned long UpperNonZeroBitPos() {
 		uint8_t addition = 3 & ( sz >> (ix-2) );
 		ix = ((ix-2)<<2) + addition - 3;
 		return static_cast<uint8_t>(ix);
-	}
-	template<uint64_t sz>
-	static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
-	{
-		if constexpr ( sz <= 8 )
-			return 0;
-		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
-		constexpr uint8_t addition = 3 & ( sz >> (ix-2) );
-		constexpr ix1 = ((ix-2)<<2) + addition - 3;
-		return static_cast<uint8_t>(ix1);
 	}
 #else
 #error Undefined bucket size schema

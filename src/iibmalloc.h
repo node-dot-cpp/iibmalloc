@@ -1181,11 +1181,11 @@ public:
 		if constexpr ( alignment <= 8 ) 
 			ret = allocate< sz >();
 		if constexpr ( sz > 16 && sz <= 24 )
-			ret = allocate< 32 >;
+			ret = allocate< 32 >();
 		else if constexpr ( alignment <= 16 ) 
 			ret = allocate< sz >();
 		else if constexpr ( sz > 33 && sz <= 48 )
-			ret = allocate< 64 >;
+			ret = allocate< 64 >();
 		else
 			ret = allocate< sz >();
 #elif defined USE_QUAD_EXP_BUCKET_SIZES

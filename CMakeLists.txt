@@ -36,11 +36,20 @@ endif()
 #-------------------------------------------------------------------------------------------
 # Tests 
 #-------------------------------------------------------------------------------------------
-add_executable(test_iibmalloc
-  test/test_common.cpp
-  test/random_test.cpp
-  )
+include(CMakePrintHelpers)
 
-target_link_libraries(test_iibmalloc iibmalloc)
+set(IIBMALLOC_TEST OFF)
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set(IIBMALLOC_TEST ON)
+endif()
 
-add_test(Run_test_iibmalloc test_iibmalloc)
+if (IIBMALLOC_TEST)
+  add_executable(test_iibmalloc
+    test/test_common.cpp
+    test/random_test.cpp
+    )
+
+  target_link_libraries(test_iibmalloc iibmalloc)
+
+  add_test(Run_test_iibmalloc test_iibmalloc)
+endif()

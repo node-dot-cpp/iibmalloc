@@ -1275,6 +1275,32 @@ public:
 	{
 		deinitialize();
 	}
+
+	template<size_t n>
+	static void bucketIdxest()
+	{
+		if constexpr ( n > 1 )
+		{
+#ifdef USE_EXP_BUCKET_SIZES
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sizeToIndex( n ) == sizeToIndexConstexpr< n >(), "for {}: {} vs {}", n, sizeToIndex( n ), sizeToIndexConstexpr< n >() );
+#elif defined USE_HALF_EXP_BUCKET_SIZES
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sizeToIndexHalfExp( n ) == sizeToIndexHalfExpConstexpr< n >(), "for {}: {} vs {}", n, sizeToIndexHalfExp( n ), sizeToIndexHalfExpConstexpr< n >() );
+#elif defined USE_QUAD_EXP_BUCKET_SIZES
+			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sizeToIndexQuadExp( n ) == sizeToIndexQuadExpConstexpr< n >(), "for {}: {} vs {}", n, sizeToIndexQuadExp( n ), sizeToIndexQuadExpConstexpr< n >() );
+#else
+#error unexpected
+#endif
+			bucketIdxest<n-1>();
+		}
+	}
+	template<>
+	static void bucketIdxest<0>() {}
+
+	static void dbgImplementationConsistencyChecks()
+	{
+		IibAllocatorBase::bucketIdxest<300>();
+		// TODO: add related staff here
+	}
 };
 
 

@@ -213,6 +213,8 @@ void runComparisonTest( TestStartupParamsAndResults& params )
 
 void alignedAllocTest()
 {
+	IibAllocatorBase::dbgImplementationConsistencyChecks();
+
 	static constexpr size_t testCnt = 0x400;
 	struct LargeAndAligned
 	{
@@ -301,8 +303,9 @@ int main()
 	nodecpp::log::Log log;
 	log.level = nodecpp::log::LogLevel::info;
 	log.add( stdout );
+	nodecpp::logging_impl::currentLog = &log;
 
-	alignedAllocTest(); return 0;
+	alignedAllocTest();
 
 	TestRes testRes[max_threads];
 

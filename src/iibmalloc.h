@@ -843,10 +843,13 @@ static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexHalfExpConstexpr()
 {
 	if constexpr ( sz <= 8 )
 		return 0;
-	constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
-	constexpr uint8_t addition = 1 & ( (sz-1) >> (ix-1) );
-	constexpr unsigned long ix1 = ((ix-2)<<1) + addition - 1;
-	return static_cast<uint8_t>(ix1);
+	else
+	{
+		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+		constexpr uint8_t addition = 1 & ( (sz-1) >> (ix-1) );
+		constexpr unsigned long ix1 = ((ix-2)<<1) + addition - 1;
+		return static_cast<uint8_t>(ix1);
+	}
 }
 
 template<uint64_t sz>
@@ -854,10 +857,13 @@ static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
 {
 	if constexpr ( sz <= 8 )
 		return 0;
-	constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
-	constexpr uint8_t addition = 3 & ( (sz-1) >> (ix-2) );
-	constexpr unsigned long ix1 = ((ix-2)<<2) + addition - 3;
-	return static_cast<uint8_t>(ix1);
+	else
+	{
+		constexpr unsigned long ix = UpperNonZeroBitPos<sz-1>();
+		constexpr uint8_t addition = 3 & ( (sz-1) >> (ix-2) );
+		constexpr unsigned long ix1 = ((ix-2)<<2) + addition - 3;
+		return static_cast<uint8_t>(ix1);
+	}
 }
 
 

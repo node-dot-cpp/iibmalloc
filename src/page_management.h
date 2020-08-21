@@ -48,12 +48,15 @@ namespace nodecpp::iibmalloc
 
 #define GET_PERF_DATA
 
-#ifdef GET_PERF_DATA
+#if defined(GET_PERF_DATA) && !defined(SAFE_MEMORY_CHECKER_EXTENSIONS)
 #ifdef NODECPP_MSVC
 #include <intrin.h>
 #else
 #include <x86intrin.h>
 #endif
+#define NODECPP_RDTSC() __rdtsc()
+#else
+inline uint64_t NODECPP_RDTSC() { return 0; }
 #endif // GET_PERF_DATA
 
 
@@ -274,9 +277,9 @@ public:
 
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isAlignedExp(sz, blockSizeExp));
 
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		void* ptr = VirtualMemory::allocate(sz);
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 
 		stats.registerSysAlloc( sz, end - start );
 
@@ -298,9 +301,9 @@ public:
 
 		size_t sz = chk->getSize();
 		stats.registerDeallocRequest( sz );
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		VirtualMemory::deallocate(chk, sz );
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 		stats.registerSysDealloc( sz, end - start );
 
 	}
@@ -363,9 +366,9 @@ public:
 			{
 				MemoryBlockListItem* chk = static_cast<MemoryBlockListItem*>(freeBlocks[ix].popFront());
 				size_t sz = chk->getSize();
-				uint64_t start = __rdtsc();
+				uint64_t start = NODECPP_RDTSC();
 				VirtualMemory::deallocate(chk, sz );
-				uint64_t end = __rdtsc();
+				uint64_t end = NODECPP_RDTSC();
 				stats.registerSysDealloc( sz, end - start );
 			}
 		}
@@ -388,9 +391,9 @@ public:
 			}
 		}
 
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		void* ptr = VirtualMemory::allocate(sz);
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 		stats.registerSysAlloc( sz, end - start );
 
 		if (ptr)
@@ -410,9 +413,9 @@ public:
 
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, isAlignedExp(sz, blockSizeExp));
 
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		void* ptr = VirtualMemory::allocate(sz);
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 		stats.registerSysAlloc( sz, end - start );
 
 		if (ptr)
@@ -440,9 +443,9 @@ public:
 			return;
 		}
 
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		VirtualMemory::deallocate(chk, sz );
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 		stats.registerSysDealloc( sz, end - start );
 	}
 
@@ -450,9 +453,9 @@ public:
 	{
 		stats.registerDeallocRequest( sz );
 
-		uint64_t start = __rdtsc();
+		uint64_t start = NODECPP_RDTSC();
 		VirtualMemory::deallocate( block, sz );
-		uint64_t end = __rdtsc();
+		uint64_t end = NODECPP_RDTSC();
 		stats.registerSysDealloc( sz, end - start );
 	}
 

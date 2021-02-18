@@ -48,7 +48,7 @@ namespace nodecpp::iibmalloc
 
 #define GET_PERF_DATA
 
-#if defined(GET_PERF_DATA) && !defined(SAFE_MEMORY_CHECKER_EXTENSIONS)
+#if defined(GET_PERF_DATA) && !defined(SAFEMEMORY_CHECKER_EXTENSIONS)
 #ifdef NODECPP_MSVC
 #include <intrin.h>
 #else

@@ -1,12 +1,12 @@
 #-------------------------------------------------------------------------------------------
 # Copyright (c) 2020, OLogN Technologies AG
 #-------------------------------------------------------------------------------------------
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.12.4)
 project(iibmalloc CXX)
 
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/src/foundation/tools")
 include(CommonCppFlags)
@@ -28,19 +28,16 @@ add_subdirectory(src/foundation)
 
 target_link_libraries(iibmalloc foundation)
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-	# we need async exceptions
-	string( REPLACE "/EHsc" "/EHa" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" )
-endif()
 
 #-------------------------------------------------------------------------------------------
 # Tests 
 #-------------------------------------------------------------------------------------------
-include(CMakePrintHelpers)
+#include(CMakePrintHelpers)
 
-set(IIBMALLOC_TEST OFF)
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-  set(IIBMALLOC_TEST ON)
+  set(IIBMALLOC_TEST ON CACHE BOOL "Enable iibmalloc tests")
+else()
+  set(IIBMALLOC_TEST OFF CACHE BOOL "Enable iibmalloc tests")
 endif()
 
 if (IIBMALLOC_TEST)

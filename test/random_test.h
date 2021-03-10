@@ -284,6 +284,8 @@ public:
 
 class PerThreadAllocatorUnderTest
 {
+	ThreadLocalAllocatorT allocManager;
+	ThreadLocalAllocatorT* formerAlloc = nullptr;
 	ThreadTestRes* testRes;
 	size_t start;
 
@@ -295,85 +297,86 @@ public:
 	{
 		start = GetMillisecondCount();
 		testRes->rdtscBegin = __rdtsc();
-		g_AllocManager.initialize();
-//		g_AllocManager.enable();
+		allocManager.initialize();
+		formerAlloc = setCurrneAllocator( &allocManager );
 	}
 
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 	void* allocate( size_t sz ) { 
-		void* ret = g_AllocManager.zombieableAllocate( sz ); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, g_AllocManager.isZombieablePointerInBlock(ret, ret)); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !g_AllocManager.isZombieablePointerInBlock(ret, nullptr)); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz == 0 || g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz - 1)); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 16 || !g_AllocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz*2)); 
+		void* ret = allocManager.zombieableAllocate( sz ); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, allocManager.isZombieablePointerInBlock(ret, ret)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, !allocManager.isZombieablePointerInBlock(ret, nullptr)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz == 0 || allocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz - 1)); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 16 || !allocManager.isZombieablePointerInBlock(ret, reinterpret_cast<uint8_t*>(ret) + sz*2)); 
 		return ret; 
 	}
-	void deallocate( void* ptr ) { g_AllocManager.zombieableDeallocate( ptr ); }
+	void deallocate( void* ptr ) { allocManager.zombieableDeallocate( ptr ); }
 #else
 	void* allocate( size_t sz ) { 
-		void* ret = g_AllocManager.allocate( sz ); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, g_AllocManager.getAllocatedSize(ret) >= sz); 
-		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 8 || g_AllocManager.getAllocatedSize(ret) <= sz*2); 
+		void* ret = allocManager.allocate( sz ); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, allocManager.getAllocatedSize(ret) >= sz); 
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sz < 8 || allocManager.getAllocatedSize(ret) <= sz*2); 
 		return ret; 
 	}
-	void deallocate( void* ptr ) { g_AllocManager.deallocate( ptr ); }
+	void deallocate( void* ptr ) { allocManager.deallocate( ptr ); }
 #endif
 	void deinit()
 	{
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
-		g_AllocManager.killAllZombies();
+		allocManager.killAllZombies();
 #endif
-		g_AllocManager.deinitialize();
-//		g_AllocManager.disable();
+		formerAlloc = setCurrneAllocator( formerAlloc );
+		allocManager.deinitialize();
+		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, formerAlloc == &allocManager );
 	}
 
 	void doWhateverAfterSetupPhase()
 	{
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
-		g_AllocManager.killAllZombies();
+		allocManager.killAllZombies();
 #endif
 		testRes->rdtscSetup = __rdtsc();
-		testRes->rdtscSysAllocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysAllocSpent;
-		testRes->sysAllocCallCntAfterSetup = g_AllocManager.getStats().sysAllocCount;
-		testRes->rdtscSysDeallocCallSumAfterSetup = g_AllocManager.getStats().rdtscSysDeallocSpent;
-		testRes->sysDeallocCallCntAfterSetup = g_AllocManager.getStats().sysDeallocCount;
-		testRes->allocRequestCountAfterSetup = g_AllocManager.getStats().allocRequestCount;
-		testRes->deallocRequestCountAfterSetup = g_AllocManager.getStats().deallocRequestCount;
+		testRes->rdtscSysAllocCallSumAfterSetup = allocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterSetup = allocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterSetup = allocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterSetup = allocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterSetup = allocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterSetup = allocManager.getStats().deallocRequestCount;
 	}
 
 	void doWhateverWithinMainLoopPhase()
 	{
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
-		g_AllocManager.killAllZombies();
+		allocManager.killAllZombies();
 #endif
 	}
 
 	void doWhateverAfterMainLoopPhase()
 	{
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
-		g_AllocManager.killAllZombies();
+		allocManager.killAllZombies();
 #endif
 		testRes->rdtscMainLoop = __rdtsc();
-		testRes->rdtscSysAllocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysAllocSpent;
-		testRes->sysAllocCallCntAfterMainLoop = g_AllocManager.getStats().sysAllocCount;
-		testRes->rdtscSysDeallocCallSumAfterMainLoop = g_AllocManager.getStats().rdtscSysDeallocSpent;
-		testRes->sysDeallocCallCntAfterMainLoop = g_AllocManager.getStats().sysDeallocCount;
-		testRes->allocRequestCountAfterMainLoop = g_AllocManager.getStats().allocRequestCount;
-		testRes->deallocRequestCountAfterMainLoop = g_AllocManager.getStats().deallocRequestCount;
+		testRes->rdtscSysAllocCallSumAfterMainLoop = allocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterMainLoop = allocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterMainLoop = allocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterMainLoop = allocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterMainLoop = allocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterMainLoop = allocManager.getStats().deallocRequestCount;
 	}
 
 	void doWhateverAfterCleanupPhase()
 	{
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
-		g_AllocManager.killAllZombies();
+		allocManager.killAllZombies();
 #endif
 		testRes->rdtscExit = __rdtsc();
-		testRes->rdtscSysAllocCallSumAfterExit = g_AllocManager.getStats().rdtscSysAllocSpent;
-		testRes->sysAllocCallCntAfterExit = g_AllocManager.getStats().sysAllocCount;
-		testRes->rdtscSysDeallocCallSumAfterExit = g_AllocManager.getStats().rdtscSysDeallocSpent;
-		testRes->sysDeallocCallCntAfterExit = g_AllocManager.getStats().sysDeallocCount;
-		testRes->allocRequestCountAfterExit = g_AllocManager.getStats().allocRequestCount;
-		testRes->deallocRequestCountAfterExit = g_AllocManager.getStats().deallocRequestCount;
+		testRes->rdtscSysAllocCallSumAfterExit = allocManager.getStats().rdtscSysAllocSpent;
+		testRes->sysAllocCallCntAfterExit = allocManager.getStats().sysAllocCount;
+		testRes->rdtscSysDeallocCallSumAfterExit = allocManager.getStats().rdtscSysDeallocSpent;
+		testRes->sysDeallocCallCntAfterExit = allocManager.getStats().sysDeallocCount;
+		testRes->allocRequestCountAfterExit = allocManager.getStats().allocRequestCount;
+		testRes->deallocRequestCountAfterExit = allocManager.getStats().deallocRequestCount;
 		testRes->innerDur = GetMillisecondCount() - start;
 	}
 };

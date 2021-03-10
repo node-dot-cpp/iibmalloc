@@ -37,7 +37,9 @@
 
 namespace nodecpp::iibmalloc
 {
-	thread_local ThreadLocalAllocatorT g_AllocManager;
+	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
+	thread_local ThreadLocalAllocatorT* g_CurrentAllocManagerForNewDeleteInterception = nullptr;
+//	thread_local ThreadLocalAllocatorT g_AllocManager;
 }
 
 using namespace nodecpp::iibmalloc;
@@ -61,10 +63,24 @@ namespace nodecpp::iibmalloc
 
 namespace nodecpp::iibmalloc
 {
-	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
-	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
+	ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator )
+	{
 		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
 		g_CurrentAllocManager = allocator;
+		if ( g_CurrentAllocManager == nullptr )
+			g_CurrentAllocManagerForNewDeleteInterception = nullptr;
+		return ret;
+	}
+
+	bool interceptNewDeleteOperators( bool doIntercept ) {
+		bool ret = g_CurrentAllocManagerForNewDeleteInterception != nullptr;
+		if ( doIntercept )
+		{
+			g_CurrentAllocManagerForNewDeleteInterception = g_CurrentAllocManager;
+			NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, g_CurrentAllocManager != nullptr, "to intercept new/delete operators g_CurrentAllocManager must be set" );
+		}
+		else
+			g_CurrentAllocManagerForNewDeleteInterception = nullptr;
 		return ret;
 	}
 }

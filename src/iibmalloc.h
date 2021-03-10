@@ -1310,6 +1310,16 @@ public:
 };
 
 
+#ifdef NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
+typedef IibAllocatorBase ThreadLocalAllocatorT;
+#else
+class SafeIibAllocator;
+typedef SafeIibAllocator ThreadLocalAllocatorT;
+#endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
+extern thread_local ThreadLocalAllocatorT* g_CurrentAllocManager;
+
+
+
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 
 constexpr size_t guaranteed_prefix_size = 8;
@@ -1529,15 +1539,8 @@ public:
 #endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
 
 
-#ifdef NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
-typedef IibAllocatorBase ThreadLocalAllocatorT;
-#else
-typedef SafeIibAllocator ThreadLocalAllocatorT;
-#endif // NODECPP_DISNABLE_SAFE_ALLOCATION_MEANS
-
-extern thread_local ThreadLocalAllocatorT g_AllocManager;
-
-ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator );
+ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator );
+bool interceptNewDeleteOperators( bool doIntercept );
 
 } // namespace nodecpp::iibmalloc
 

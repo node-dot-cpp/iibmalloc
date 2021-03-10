@@ -227,28 +227,32 @@ void alignedAllocTest()
 		uintptr_t dummy;
 	};
 
-	g_AllocManager.initialize();
+	ThreadLocalAllocatorT allocManager;
+	allocManager.initialize();
+	ThreadLocalAllocatorT* formerAlloc = setCurrneAllocator( &allocManager );
+	interceptNewDeleteOperators( &allocManager );
+
 	void* ptrs[testCnt];
 
 	// direct usage
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		ptrs[i] = g_AllocManager.allocateAligned<32>(47);
+		ptrs[i] = allocManager.allocateAligned<32>(47);
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 31 ) == 0 );
 	}
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		g_AllocManager.deallocate(ptrs[i]);
+		allocManager.deallocate(ptrs[i]);
 	}
 
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		ptrs[i] = g_AllocManager.allocateAligned<16>(22);
+		ptrs[i] = allocManager.allocateAligned<16>(22);
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, ( (uintptr_t)(ptrs[i]) & 15 ) == 0 );
 	}
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		g_AllocManager.deallocate(ptrs[i]);
+		allocManager.deallocate(ptrs[i]);
 	}
 
 	// new/delete interception (no iiballoc)
@@ -273,7 +277,7 @@ void alignedAllocTest()
 	}
 
 	// new/delete interception (with iibmalloc)
-	ThreadLocalAllocatorT* former = interceptNewDeleteOperators( &g_AllocManager );
+	bool former = interceptNewDeleteOperators( true );
 	for ( size_t i=0; i<testCnt; ++i )
 	{
 		ptrs[i] = new char [7];
@@ -295,7 +299,9 @@ void alignedAllocTest()
 	}
 
 	interceptNewDeleteOperators( former );
-	g_AllocManager.deinitialize();
+	formerAlloc = setCurrneAllocator( formerAlloc );
+	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, formerAlloc == &allocManager );
+	allocManager.deinitialize();
 }
 
 int main()

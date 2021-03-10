@@ -38,52 +38,23 @@
 namespace nodecpp::iibmalloc
 {
 	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
-	thread_local ThreadLocalAllocatorT* g_CurrentAllocManagerForNewDeleteInterception = nullptr;
-//	thread_local ThreadLocalAllocatorT g_AllocManager;
+	ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator )
+	{
+		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
+		g_CurrentAllocManager = allocator;
+		return ret;
+	}
 }
 
 using namespace nodecpp::iibmalloc;
 
-#ifdef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
-
-namespace nodecpp::iibmalloc
-{
-	ThreadLocalAllocatorT* interceptNewDeleteOperators( ThreadLocalAllocatorT* allocator ) { 
-		return nullptr;
-	}
-}
-
-#else // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
+#ifndef NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 
 // We need it as a workaround because of P0302R0
 //    http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0302r0.html
 // if we want lambda-related allocations to be done with a specific allocator
 
 #include <malloc_based_allocator.h>
-
-namespace nodecpp::iibmalloc
-{
-	ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator )
-	{
-		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;
-		g_CurrentAllocManager = allocator;
-		if ( g_CurrentAllocManager == nullptr )
-			g_CurrentAllocManagerForNewDeleteInterception = nullptr;
-		return ret;
-	}
-
-	bool interceptNewDeleteOperators( bool doIntercept ) {
-		bool ret = g_CurrentAllocManagerForNewDeleteInterception != nullptr;
-		if ( doIntercept )
-		{
-			g_CurrentAllocManagerForNewDeleteInterception = g_CurrentAllocManager;
-			NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, g_CurrentAllocManager != nullptr, "to intercept new/delete operators g_CurrentAllocManager must be set" );
-		}
-		else
-			g_CurrentAllocManagerForNewDeleteInterception = nullptr;
-		return ret;
-	}
-}
 
 void* operator new(std::size_t count)
 {

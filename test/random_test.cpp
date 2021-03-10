@@ -230,7 +230,6 @@ void alignedAllocTest()
 	ThreadLocalAllocatorT allocManager;
 	allocManager.initialize();
 	ThreadLocalAllocatorT* formerAlloc = setCurrneAllocator( &allocManager );
-	interceptNewDeleteOperators( &allocManager );
 
 	void* ptrs[testCnt];
 
@@ -277,7 +276,6 @@ void alignedAllocTest()
 	}
 
 	// new/delete interception (with iibmalloc)
-	bool former = interceptNewDeleteOperators( true );
 	for ( size_t i=0; i<testCnt; ++i )
 	{
 		ptrs[i] = new char [7];
@@ -298,7 +296,6 @@ void alignedAllocTest()
 		delete (LargeAndAligned*)(ptrs[i]);
 	}
 
-	interceptNewDeleteOperators( former );
 	formerAlloc = setCurrneAllocator( formerAlloc );
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, formerAlloc == &allocManager );
 	allocManager.deinitialize();

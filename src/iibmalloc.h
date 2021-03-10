@@ -1540,7 +1540,6 @@ public:
 
 
 ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator );
-bool interceptNewDeleteOperators( bool doIntercept );
 
 } // namespace nodecpp::iibmalloc
 

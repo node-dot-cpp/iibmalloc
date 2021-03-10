@@ -40,8 +40,11 @@
 #include "page_management.h"
 
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
+#include <allocator_template.h>
+#include <malloc_based_allocator.h>
 #include <map>
 #endif
+
 
 
 namespace nodecpp::iibmalloc
@@ -1333,7 +1336,19 @@ protected:
 	void* zombieLargeChunks;
 
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
-	std::map<uint8_t*, size_t, std::greater<uint8_t*>> zombieMap; // TODO: consider using thread-local allocator
+	struct ThisAllocator
+	{
+		static constexpr size_t guaranteed_alignment = NODECPP_GUARANTEED_IIBMALLOC_ALIGNMENT;
+		template<size_t alignment = 0> 
+		static NODECPP_FORCEINLINE void* allocate( size_t allocSize ) { return g_CurrentAllocManager->allocateAligned<alignment>( allocSize ); }
+		template<size_t alignment = 0> 
+		static NODECPP_FORCEINLINE void deallocate( void* ptr ) { g_CurrentAllocManager->deallocate( ptr ); }
+	};
+	template<class _Ty>
+//	using thisallocator = ::nodecpp::selective_allocator<ThisAllocator, _Ty>; // NOTE: map::ctor perform allocations. Since mechanics of ThisAllocator assumes ptr to current allocator which is yet to be set at tome of allocator creation, this won't work. If iibmalloc is desired for such purposes further consideration is necessary
+	using thisallocator = ::nodecpp::selective_allocator<StdRawAllocator, _Ty>;
+	using dataptrt = uint8_t*;
+	std::map<uint8_t*, size_t, std::greater<uint8_t*>, thisallocator<std::pair<const dataptrt, size_t>>> zombieMap; // TODO: consider using thread-local allocator
 	bool doZombieEarlyDetection_ = true;
 #endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	

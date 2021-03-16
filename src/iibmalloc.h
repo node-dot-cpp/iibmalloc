@@ -1351,9 +1351,9 @@ protected:
 		ThisAllocator( ThisAllocator&& other ) = delete;
 		ThisAllocator& operator = ( ThisAllocator&& other ) = delete;
 		template<size_t alignment = 0> 
-		static NODECPP_FORCEINLINE void* allocate( size_t allocSize ) { return allocator_->allocateAligned<alignment>( allocSize ); }
+		NODECPP_FORCEINLINE void* allocate( size_t allocSize ) { return allocator->allocateAligned<alignment>( allocSize ); }
 		template<size_t alignment = 0> 
-		static NODECPP_FORCEINLINE void deallocate( void* ptr ) { allocator_->deallocate( ptr ); }
+		NODECPP_FORCEINLINE void deallocate( void* ptr ) { allocator->deallocate( ptr ); }
 	};
 	template<class _Ty>
 //	using thisallocator = ::nodecpp::selective_allocator<ThisAllocator, _Ty>; // NOTE: map::ctor perform allocations. Since mechanics of ThisAllocator assumes ptr to current allocator which is yet to be set at tome of allocator creation, this won't work. If iibmalloc is desired for such purposes further consideration is necessary

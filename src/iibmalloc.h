@@ -1330,6 +1330,10 @@ constexpr size_t guaranteed_prefix_size = 8;
 class SafeIibAllocator : protected IibAllocatorBase
 {
 	static_assert( guaranteed_prefix_size >= sizeof(void*) ); // required to keep zombie list item pointer 'next' inside a block
+
+	static std::atomic<uint16_t> allocatorIDBase;
+	uint16_t allocatorID_;
+
 protected:
 	void** zombieBucketsFirst[BucketCount];
 	void** zombieBucketsLast[BucketCount];
@@ -1358,10 +1362,10 @@ public:
 	SafeIibAllocator(SafeIibAllocator&&) = default;
 	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
 	SafeIibAllocator& operator=(SafeIibAllocator&&) = default;
+	
+	auto allocatorID() { return allocatorID_; }
 
 	using IibAllocatorBase::maximalSupportedAlignment;
-//	void enable() {}
-//	void disable() {}
 
 	bool doZombieEarlyDetection( bool doIt = true )
 	{
@@ -1520,6 +1524,11 @@ public:
 
 	void initialize(size_t size)
 	{
+		++allocatorIDBase;
+		if ( allocatorIDBase == 0 )
+			++allocatorIDBase;
+		allocatorID_ = allocatorIDBase;
+
 		initialize();
 	}
 

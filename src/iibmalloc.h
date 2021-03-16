@@ -1340,13 +1340,20 @@ protected:
 	void* zombieLargeChunks;
 
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
-	struct ThisAllocator
+	class ThisAllocator
 	{
+		SafeIibAllocator* allocator;
 		static constexpr size_t guaranteed_alignment = NODECPP_GUARANTEED_IIBMALLOC_ALIGNMENT;
+	public:
+		ThisAllocator( SafeIibAllocator* allocator_ ) : allocator( allocator_ ) {}
+		ThisAllocator( const ThisAllocator& other ) = default;
+		ThisAllocator& operator = ( const ThisAllocator& other ) = default;
+		ThisAllocator( ThisAllocator&& other ) = delete;
+		ThisAllocator& operator = ( ThisAllocator&& other ) = delete;
 		template<size_t alignment = 0> 
-		static NODECPP_FORCEINLINE void* allocate( size_t allocSize ) { return g_CurrentAllocManager->allocateAligned<alignment>( allocSize ); }
+		static NODECPP_FORCEINLINE void* allocate( size_t allocSize ) { return allocator_->allocateAligned<alignment>( allocSize ); }
 		template<size_t alignment = 0> 
-		static NODECPP_FORCEINLINE void deallocate( void* ptr ) { g_CurrentAllocManager->deallocate( ptr ); }
+		static NODECPP_FORCEINLINE void deallocate( void* ptr ) { allocator_->deallocate( ptr ); }
 	};
 	template<class _Ty>
 //	using thisallocator = ::nodecpp::selective_allocator<ThisAllocator, _Ty>; // NOTE: map::ctor perform allocations. Since mechanics of ThisAllocator assumes ptr to current allocator which is yet to be set at tome of allocator creation, this won't work. If iibmalloc is desired for such purposes further consideration is necessary

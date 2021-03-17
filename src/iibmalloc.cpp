@@ -37,7 +37,10 @@
 
 namespace nodecpp::iibmalloc
 {
+	std::atomic<uint16_t> SafeIibAllocator::allocatorIDBase;
+
 	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
+
 	ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator )
 	{
 		ThreadLocalAllocatorT* ret = g_CurrentAllocManager;

@@ -1531,16 +1531,16 @@ public:
 
 	void initialize(size_t size)
 	{
-		++allocatorIDBase;
-		if ( allocatorIDBase == 0 )
-			++allocatorIDBase;
-		allocatorID_ = allocatorIDBase;
-
 		initialize();
 	}
 
 	void initialize()
 	{
+		++allocatorIDBase;
+		if ( allocatorIDBase == 0 )
+			++allocatorIDBase;
+		allocatorID_ = allocatorIDBase;
+
 		IibAllocatorBase::initialize();
 		for ( size_t i=0; i<BucketCount; ++i)
 		{

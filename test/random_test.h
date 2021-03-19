@@ -326,7 +326,6 @@ public:
 		allocManager.killAllZombies();
 #endif
 		formerAlloc = setCurrneAllocator( formerAlloc );
-		allocManager.deinitialize();
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, formerAlloc == &allocManager );
 	}
 

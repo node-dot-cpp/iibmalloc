@@ -1,5 +1,5 @@
  /* -------------------------------------------------------------------------------
- * Copyright (c) 2018, OLogN Technologies AG
+ * Copyright (c) 2018-2021, OLogN Technologies AG
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1274,12 +1274,14 @@ public:
 		bulkAllocator.initialize( PAGE_SIZE_EXP );
 	}
 
+private:
 	void deinitialize()
 	{
 		pageAllocator.deinitialize();
 		bulkAllocator.deinitialize();
 	}
 
+public:
 	~IibAllocatorBase()
 	{
 		deinitialize();
@@ -1342,10 +1344,12 @@ protected:
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	class ThisAllocator
 	{
-		SafeIibAllocator* allocator;
+		IibAllocatorBase* allocator;
+	public:
+		static constexpr bool objectRequired = true;
 		static constexpr size_t guaranteed_alignment = NODECPP_GUARANTEED_IIBMALLOC_ALIGNMENT;
 	public:
-		ThisAllocator( SafeIibAllocator* allocator_ ) : allocator( allocator_ ) {}
+		ThisAllocator( IibAllocatorBase* allocator_ ) : allocator( allocator_ ) {}
 		ThisAllocator( const ThisAllocator& other ) = default;
 		ThisAllocator& operator = ( const ThisAllocator& other ) = default;
 		ThisAllocator( ThisAllocator&& other ) = delete;
@@ -1356,15 +1360,15 @@ protected:
 		NODECPP_FORCEINLINE void deallocate( void* ptr ) { allocator->deallocate( ptr ); }
 	};
 	template<class _Ty>
-//	using thisallocator = ::nodecpp::selective_allocator<ThisAllocator, _Ty>; // NOTE: map::ctor perform allocations. Since mechanics of ThisAllocator assumes ptr to current allocator which is yet to be set at tome of allocator creation, this won't work. If iibmalloc is desired for such purposes further consideration is necessary
-	using thisallocator = ::nodecpp::selective_allocator<StdRawAllocator, _Ty>;
+	using thisallocator = ::nodecpp::selective_allocator<ThisAllocator, _Ty>; // NOTE: map::ctor perform allocations. Since mechanics of ThisAllocator assumes ptr to current allocator which is yet to be set at tome of allocator creation, this won't work. If iibmalloc is desired for such purposes further consideration is necessary
+//	using thisallocator = ::nodecpp::selective_allocator<StdRawAllocator, _Ty>;
 	using dataptrt = uint8_t*;
-	std::map<uint8_t*, size_t, std::greater<uint8_t*>, thisallocator<std::pair<const dataptrt, size_t>>> zombieMap; // TODO: consider using thread-local allocator
+	std::map<uint8_t*, size_t, std::greater<uint8_t*>, thisallocator<std::pair<const dataptrt, size_t>>> zombieMap;
 	bool doZombieEarlyDetection_ = true;
 #endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	
 public:
-	SafeIibAllocator() { initialize(); }
+	SafeIibAllocator() : zombieMap( thisallocator<std::pair<const dataptrt, size_t>>(ThisAllocator(this) ) ) { initialize(); }
 	SafeIibAllocator(const SafeIibAllocator&) = delete;
 	SafeIibAllocator(SafeIibAllocator&&) = default;
 	SafeIibAllocator& operator=(const SafeIibAllocator&) = delete;
@@ -1541,7 +1545,6 @@ public:
 			++allocatorIDBase;
 		allocatorID_ = allocatorIDBase;
 
-		IibAllocatorBase::initialize();
 		for ( size_t i=0; i<BucketCount; ++i)
 		{
 			zombieBucketsFirst[i] = nullptr;
@@ -1553,14 +1556,14 @@ public:
 #endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 	}
 
-	void deinitialize()
+	/*void deinitialize()
 	{
-		IibAllocatorBase::deinitialize();
 #ifndef NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
 		NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, doZombieEarlyDetection_ || ( !doZombieEarlyDetection_ && zombieMap.empty() ) );
 		zombieMap.clear();
 #endif // NODECPP_DISABLE_ZOMBIE_ACCESS_EARLY_DETECTION
-	}
+		IibAllocatorBase::deinitialize();
+	}*/
 
 	~SafeIibAllocator()
 	{

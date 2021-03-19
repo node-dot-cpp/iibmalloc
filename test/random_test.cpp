@@ -228,7 +228,7 @@ void alignedAllocTest()
 	};
 
 	ThreadLocalAllocatorT allocManager;
-	allocManager.initialize();
+//	allocManager.initialize();
 	ThreadLocalAllocatorT* formerAlloc = setCurrneAllocator( &allocManager );
 
 	void* ptrs[testCnt];
@@ -298,7 +298,6 @@ void alignedAllocTest()
 
 	formerAlloc = setCurrneAllocator( formerAlloc );
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, formerAlloc == &allocManager );
-	allocManager.deinitialize();
 }
 
 int main()

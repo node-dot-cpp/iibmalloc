@@ -1290,7 +1290,7 @@ public:
 	template<size_t n>
 	static void bucketIdxest()
 	{
-		if constexpr ( n > 1 )
+		if constexpr ( n >= 1 )
 		{
 #ifdef USE_EXP_BUCKET_SIZES
 			NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, sizeToIndex( n ) == sizeToIndexConstexpr< n >(), "for {}: {} vs {}", n, sizeToIndex( n ), sizeToIndexConstexpr< n >() );
@@ -1301,11 +1301,10 @@ public:
 #else
 #error unexpected
 #endif
-			bucketIdxest<n-1>();
+			if constexpr ( n > 1 )
+				bucketIdxest<n-1>();
 		}
 	}
-	template<>
-	static void bucketIdxest<0>() {}
 
 	static void dbgImplementationConsistencyChecks()
 	{

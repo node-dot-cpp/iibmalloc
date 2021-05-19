@@ -1326,6 +1326,8 @@ extern thread_local ThreadLocalAllocatorT* g_CurrentAllocManager;
 
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 
+#include <atomic>
+
 constexpr size_t guaranteed_prefix_size = 8;
 
 class SafeIibAllocator : protected IibAllocatorBase

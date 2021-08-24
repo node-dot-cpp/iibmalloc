@@ -115,49 +115,75 @@ void* operator new[](std::size_t count, std::align_val_t al)
 	return ret;
 }
 
-void operator delete(void* ptr) noexcept
+static NODECPP_FORCEINLINE
+void operator_delete_impl(void* ptr) noexcept
 {
 	if ( g_CurrentAllocManager )
 		g_CurrentAllocManager->deallocate(ptr);
 	else
 		free(ptr);
+}
+
+static NODECPP_FORCEINLINE
+void operator_delete_impl(void* ptr, std::align_val_t al) noexcept
+{
+	if ( g_CurrentAllocManager )
+	{
+		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= ThreadLocalAllocatorT::maximalSupportedAlignment, "{} vs. {}", (size_t)al, ThreadLocalAllocatorT::maximalSupportedAlignment );
+		g_CurrentAllocManager->deallocate(ptr);
+	}
+	else
+	{
+		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
+		nodecpp::StdRawAllocator::deallocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(ptr);
+	}
+}
+
+
+void operator delete(void* ptr) noexcept
+{
+	operator_delete_impl(ptr);
 }
 
 void operator delete(void* ptr, std::align_val_t al) noexcept
 {
-	if ( g_CurrentAllocManager )
-	{
-		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= ThreadLocalAllocatorT::maximalSupportedAlignment, "{} vs. {}", (size_t)al, ThreadLocalAllocatorT::maximalSupportedAlignment );
-		g_CurrentAllocManager->deallocate(ptr);
-	}
-	else
-	{
-		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
-		nodecpp::StdRawAllocator::deallocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(ptr);
-	}
+	operator_delete_impl(ptr, al);
 }
 
 void operator delete[](void* ptr) noexcept
 {
-	if ( g_CurrentAllocManager )
-		g_CurrentAllocManager->deallocate(ptr);
-	else
-		free(ptr);
+	operator_delete_impl(ptr);
 }
 
 void operator delete[](void* ptr, std::align_val_t al) noexcept
 {
-	if ( g_CurrentAllocManager )
-	{
-		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= ThreadLocalAllocatorT::maximalSupportedAlignment, "{} vs. {}", (size_t)al, ThreadLocalAllocatorT::maximalSupportedAlignment );
-		g_CurrentAllocManager->deallocate(ptr);
-	}
-	else
-	{
-		NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, (size_t)al <= NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW, "{} vs. {}", (size_t)al, NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW );
-		nodecpp::StdRawAllocator::deallocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(ptr);
-	}
+	operator_delete_impl(ptr, al);
 }
+
+// mb:sized deletes to make gcc happy, and to improve completeness,
+// otherwise an operator delete of the std may get called and break things
+void operator delete  ( void* ptr, std::size_t sz ) noexcept
+{
+	operator_delete_impl(ptr);
+}
+
+void operator delete[]( void* ptr, std::size_t sz ) noexcept
+{
+	operator_delete_impl(ptr);
+}
+
+void operator delete  ( void* ptr, std::size_t sz, std::align_val_t al ) noexcept
+{
+	operator_delete_impl(ptr, al);
+}
+
+void operator delete[]( void* ptr, std::size_t sz, std::align_val_t al ) noexcept
+{
+	operator_delete_impl(ptr, al);
+}
+
+
+
 #endif // NODECPP_IIBMALLOC_DISABLE_NEW_DELETE_INTERCEPTION
 
 #if __cplusplus >= 201703L

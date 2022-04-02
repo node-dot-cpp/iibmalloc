@@ -1,5 +1,5 @@
  /* -------------------------------------------------------------------------------
- * Copyright (c) 2018-2021, OLogN Technologies AG
+ * Copyright (c) 2018-2022, OLogN Technologies AG
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,8 @@
  * v.1.00    May-09-2018    Initial release
  * 
  * -------------------------------------------------------------------------------*/
+
+// NOTE: details regarding memory layout for ARM64 see here: https://www.kernel.org/doc/html/latest/arm64/memory.html
 
  
 #ifndef IIBMALLOC_H
@@ -887,7 +889,7 @@ static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined NODECPP_X64
+#elif (defined NODECPP_X64) || (defined NODECPP_ARM64)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 	NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)
@@ -947,7 +949,7 @@ static NODECPP_FORCEINLINE constexpr uint8_t sizeToIndexQuarterExpConstexpr()
 #else
 #error Undefined bucket size schema
 #endif
-#elif defined NODECPP_X64
+#elif (defined NODECPP_X64) || (defined NODECPP_ARM64)
 #ifdef USE_EXP_BUCKET_SIZES
 	static
 		NODECPP_FORCEINLINE uint8_t sizeToIndex(uint64_t sz)

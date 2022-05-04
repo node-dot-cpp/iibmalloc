@@ -71,11 +71,11 @@ class CollectionInPages : public BasePageAllocator
 	struct ListItem
 	{
 		ItemT item;
-		ListItem* next;
+		ListItem* next = nullptr;
 	};
-	ListItem* head;
-	ListItem* freeList;
-	size_t pageCnt;
+	ListItem* head = nullptr;
+	ListItem* freeList = nullptr;
+	size_t pageCnt = 0;
 	void collectPageStarts( ListItem** pageStartHead, ListItem* fromList )
 	{
 		ListItem* curr = fromList;
@@ -173,7 +173,7 @@ class SoundingAddressPageAllocator : public BasePageAllocator
 	struct MemoryBlockHeader
 	{
 		MemoryBlockListItem block;
-		MemoryBlockHeader* next;
+		MemoryBlockHeader* next = nullptr;
 	};
 	
 	struct PageBlockDescriptor
@@ -481,7 +481,7 @@ private:
 		FreeChunkHeader* prevFree = nullptr;
 		FreeChunkHeader* nextFree = nullptr;
 	};
-	FreeChunkHeader* freeListBegin[ max_pages + 1 ];
+	FreeChunkHeader* freeListBegin[ max_pages + 1 ] = {nullptr};
 
 	void removeFromFreeList( FreeChunkHeader* item )
 	{

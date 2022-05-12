@@ -804,20 +804,20 @@ protected:
 public:
 #ifdef USE_EXP_BUCKET_SIZES
 	static constexpr
-	NODECPP_FORCEINLINE size_t indexToBucketSize(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSize(size_t ix) // Note: currently is used once per page formatting
 	{
 		return 1ULL << (ix + 3);
 	}
 #elif defined USE_HALF_EXP_BUCKET_SIZES
 	static constexpr
-	NODECPP_FORCEINLINE size_t indexToBucketSizeHalfExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeHalfExp(size_t ix) // Note: currently is used once per page formatting
 	{
 		size_t ret = ( 1ULL << ((ix>>1) + 3) ) + ( ( ( ( ix + 1ULL ) & 1 ) - 1 ) & ( 1ULL << ((ix>>1) + 2) ) );
 		return alignUpExp( ret, 3 ); // this is because of case ix = 1, ret = 12 (keeping 8-byte alignment)
 	}
 #elif defined USE_QUAD_EXP_BUCKET_SIZES
 	static constexpr
-	NODECPP_FORCEINLINE size_t indexToBucketSizeQuarterExp(uint8_t ix) // Note: currently is used once per page formatting
+	NODECPP_FORCEINLINE size_t indexToBucketSizeQuarterExp(size_t ix) // Note: currently is used once per page formatting
 	{
 		ix += 3;
 		size_t ret = ( 4ULL << ((ix>>2)) ) + ((ix&3)+1) * (1ULL << ((ix>>2)));

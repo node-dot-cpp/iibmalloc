@@ -61,16 +61,21 @@ using namespace nodecpp::iibmalloc;
 
 void* operator new(std::size_t count)
 {
+	void* ret;
 	if ( g_CurrentAllocManager )
 	{
-		void* ret = g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
-		return ret;
+		ret = g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
 	}
 	else
 	{
-		void* ret = malloc(count);
-		return ret;
+		if ( count ) // likely
+            ret = malloc(count);
+		else
+			ret = malloc(++count);
 	}
+    if ( ret )
+        return ret; 
+    throw std::bad_alloc{};
 }
 
 void* operator new(std::size_t count, std::align_val_t al)
@@ -95,7 +100,12 @@ void* operator new[](std::size_t count)
 	if ( g_CurrentAllocManager )
 		return g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
 	else
-		return malloc(count);
+	{
+		void* ret = malloc(count);
+		if ( ret )
+			return ret; 
+		throw std::bad_alloc{};
+	}
 }
 
 void* operator new[](std::size_t count, std::align_val_t al)

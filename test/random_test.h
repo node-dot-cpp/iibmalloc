@@ -87,7 +87,7 @@ NODECPP_FORCEINLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t
 {
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, maxSizeExp >= 3 );
 	maxSizeExp -= 3;
-	uint32_t statClassBase = (randNum & (( 1 << maxSizeExp ) - 1)) + 1; // adding 1 to avoid dealing with 0
+	uint32_t statClassBase = (uint32_t)((randNum & (( 1ULL << maxSizeExp ) - 1)) + 1); // adding 1 to avoid dealing with 0
 	randNum >>= maxSizeExp;
 	unsigned long idx;
 #ifdef NODECPP_MSVC
@@ -101,8 +101,8 @@ NODECPP_FORCEINLINE size_t calcSizeWithStatsAdjustment( uint64_t randNum, size_t
 //	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx <= maxSizeExp - 3 );
 	NODECPP_ASSERT(nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::critical, idx <= maxSizeExp );
 	idx += 2;
-	size_t szMask = ( 1 << idx ) - 1;
-	return (randNum & szMask) + 1 + (((size_t)1)<<idx);
+	uint64_t szMask = ( 1ULL << idx ) - 1;
+	return (randNum & szMask) + 1 + ((1ULL)<<idx);
 }
 
 inline void testDistribution()
@@ -254,8 +254,8 @@ struct ThreadStartupParamsAndResults
 
 class NewDeleteUnderTest
 {
-	CommonTestResults* testRes;
-	size_t start;
+	CommonTestResults* testRes = nullptr;
+	size_t start = 0;
 
 public:
 	NewDeleteUnderTest( CommonTestResults* testRes_ ) { testRes = testRes_; }
@@ -286,8 +286,8 @@ class PerThreadAllocatorUnderTest
 {
 	ThreadLocalAllocatorT allocManager;
 	ThreadLocalAllocatorT* formerAlloc = nullptr;
-	ThreadTestRes* testRes;
-	size_t start;
+	ThreadTestRes* testRes = nullptr;
+	size_t start = 0;
 
 public:
 	PerThreadAllocatorUnderTest( ThreadTestRes* testRes_ ) { testRes = testRes_; }
@@ -382,8 +382,8 @@ public:
 
 class FakeAllocatorUnderTest
 {
-	CommonTestResults* testRes;
-	size_t start;
+	CommonTestResults* testRes = nullptr;
+	size_t start = 0;
 	uint8_t* fakeBuffer = nullptr;
 	static constexpr size_t fakeBufferSize = 0x1000000;
 
@@ -459,7 +459,7 @@ size_t Pareto_80_20_6_Rand( const Pareto_80_20_6_Data& data, uint32_t rnum1, uin
 	else if ( rnum1 < data.probabilityRanges[5] )
 		idx = 5;
 	uint32_t rangeSize = data.offsets[ idx + 1 ] - data.offsets[ idx ];
-	uint32_t offsetInRange = rnum2 % rangeSize;
+	size_t offsetInRange = rnum2 % rangeSize;
 	return data.offsets[ idx ] + offsetInRange;
 }
 

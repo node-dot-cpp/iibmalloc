@@ -92,7 +92,10 @@ void* operator new(std::size_t count, std::align_val_t al)
 		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
 	}
 	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
-	return ret;
+
+    if ( ret )
+        return ret; 
+    throw std::bad_alloc{};
 }
 
 void* operator new[](std::size_t count)
@@ -122,7 +125,9 @@ void* operator new[](std::size_t count, std::align_val_t al)
 		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
 	}
 	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
-	return ret;
+    if ( ret )
+        return ret; 
+    throw std::bad_alloc{};
 }
 
 static NODECPP_FORCEINLINE

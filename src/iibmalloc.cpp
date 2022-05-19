@@ -61,21 +61,22 @@ using namespace nodecpp::iibmalloc;
 
 void* operator new(std::size_t count)
 {
-	void* ret;
 	if ( g_CurrentAllocManager )
 	{
-		ret = g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
+		return g_CurrentAllocManager->allocateAligned<__STDCPP_DEFAULT_NEW_ALIGNMENT__>(count);
 	}
 	else
 	{
+		void* ret;
 		if ( count ) // likely
             ret = malloc(count);
 		else
 			ret = malloc(++count);
+
+		if ( ret )
+			return ret; 
+		throw std::bad_alloc{};
 	}
-    if ( ret )
-        return ret; 
-    throw std::bad_alloc{};
 }
 
 void* operator new(std::size_t count, std::align_val_t al)
@@ -92,10 +93,7 @@ void* operator new(std::size_t count, std::align_val_t al)
 		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
 	}
 	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
-
-    if ( ret )
-        return ret; 
-    throw std::bad_alloc{};
+	return ret; 
 }
 
 void* operator new[](std::size_t count)
@@ -125,9 +123,7 @@ void* operator new[](std::size_t count, std::align_val_t al)
 		ret = nodecpp::StdRawAllocator::allocate<NODECPP_MAX_SUPPORTED_ALIGNMENT_FOR_NEW>(count);
 	}
 	NODECPP_ASSERT( nodecpp::iibmalloc::module_id, nodecpp::assert::AssertLevel::pedantic, ( (size_t)ret & ((size_t)al - 1)) == 0, "ret = 0x{:x}, al = {}", (size_t)ret, (size_t)al );
-    if ( ret )
-        return ret; 
-    throw std::bad_alloc{};
+	return ret; 
 }
 
 static NODECPP_FORCEINLINE

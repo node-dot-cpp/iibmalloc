@@ -264,7 +264,7 @@ public:
 	{
 		start = GetMillisecondCount();
 		testRes->threadID = threadID; // just as received
-		testRes->rdtscBegin = __rdtsc();
+		testRes->rdtscBegin = NODECPP_RDTSC();
 	}
 
 	void* allocate( size_t sz ) { return new uint8_t[ sz ]; }
@@ -272,12 +272,12 @@ public:
 
 	void deinit() {}
 
-	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = NODECPP_RDTSC(); }
 	void doWhateverWithinMainLoopPhase() {}
-	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
+	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = NODECPP_RDTSC(); }
 	void doWhateverAfterCleanupPhase()
 	{
-		testRes->rdtscExit = __rdtsc();
+		testRes->rdtscExit = NODECPP_RDTSC();
 		testRes->innerDur = GetMillisecondCount() - start;
 	}
 };
@@ -296,7 +296,7 @@ public:
 	void init( size_t threadID )
 	{
 		start = GetMillisecondCount();
-		testRes->rdtscBegin = __rdtsc();
+		testRes->rdtscBegin = NODECPP_RDTSC();
 		allocManager.initialize();
 		formerAlloc = setCurrneAllocator( &allocManager );
 	}
@@ -334,7 +334,7 @@ public:
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		allocManager.killAllZombies();
 #endif
-		testRes->rdtscSetup = __rdtsc();
+		testRes->rdtscSetup = NODECPP_RDTSC();
 		testRes->rdtscSysAllocCallSumAfterSetup = allocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterSetup = allocManager.getStats().sysAllocCount;
 		testRes->rdtscSysDeallocCallSumAfterSetup = allocManager.getStats().rdtscSysDeallocSpent;
@@ -355,7 +355,7 @@ public:
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		allocManager.killAllZombies();
 #endif
-		testRes->rdtscMainLoop = __rdtsc();
+		testRes->rdtscMainLoop = NODECPP_RDTSC();
 		testRes->rdtscSysAllocCallSumAfterMainLoop = allocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterMainLoop = allocManager.getStats().sysAllocCount;
 		testRes->rdtscSysDeallocCallSumAfterMainLoop = allocManager.getStats().rdtscSysDeallocSpent;
@@ -369,7 +369,7 @@ public:
 #ifndef NODECPP_DISABLE_SAFE_ALLOCATION_MEANS
 		allocManager.killAllZombies();
 #endif
-		testRes->rdtscExit = __rdtsc();
+		testRes->rdtscExit = NODECPP_RDTSC();
 		testRes->rdtscSysAllocCallSumAfterExit = allocManager.getStats().rdtscSysAllocSpent;
 		testRes->sysAllocCallCntAfterExit = allocManager.getStats().sysAllocCount;
 		testRes->rdtscSysDeallocCallSumAfterExit = allocManager.getStats().rdtscSysDeallocSpent;
@@ -395,7 +395,7 @@ public:
 	{
 		start = GetMillisecondCount();
 		testRes->threadID = threadID; // just as received
-		testRes->rdtscBegin = __rdtsc();
+		testRes->rdtscBegin = NODECPP_RDTSC();
 		fakeBuffer = new uint8_t [fakeBufferSize];
 	}
 
@@ -404,12 +404,12 @@ public:
 
 	void deinit() { if ( fakeBuffer ) delete [] fakeBuffer; fakeBuffer = nullptr; }
 
-	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = __rdtsc(); }
+	void doWhateverAfterSetupPhase() { testRes->rdtscSetup = NODECPP_RDTSC(); }
 	void doWhateverWithinMainLoopPhase() {}
-	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = __rdtsc(); }
+	void doWhateverAfterMainLoopPhase() { testRes->rdtscMainLoop = NODECPP_RDTSC(); }
 	void doWhateverAfterCleanupPhase()
 	{
-		testRes->rdtscExit = __rdtsc();
+		testRes->rdtscExit = NODECPP_RDTSC();
 		testRes->innerDur = GetMillisecondCount() - start;
 	}
 };

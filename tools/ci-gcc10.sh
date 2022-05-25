@@ -8,7 +8,7 @@ cd build/gcc10
 export CC=gcc-10
 export CXX=g++-10
 
-cmake -DCMAKE_BUILD_TYPE=Release -DSAFEMEMORY_TEST=ON -G "Unix Makefiles" ../..
+cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../..
 
 cmake --build .
 

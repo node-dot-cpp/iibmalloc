@@ -8,7 +8,7 @@ cd build/clang11
 export CC=clang-11
 export CXX=clang++-11
 
-cmake -DCMAKE_BUILD_TYPE=Release -DSAFEMEMORY_TEST=ON -G "Unix Makefiles" ../..
+cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../..
 
 cmake --build .
 

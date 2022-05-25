@@ -8,7 +8,7 @@ cd build/clang13
 export CC=clang-13
 export CXX=clang++-13
 
-cmake -DCMAKE_BUILD_TYPE=Release -DSAFEMEMORY_TEST=ON -G "Unix Makefiles" ../..
+cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../..
 
 cmake --build .
 

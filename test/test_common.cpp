@@ -39,7 +39,7 @@
 
 #if defined NODECPP_WINDOWS
 #include <Windows.h>
-#elif defined NODECPP_LINUX
+#elif defined NODECPP_LINUX || defined(NODECPP_ANDROID)
 #include <time.h>
 #elif defined NODECPP_MAC
 #include <mach/clock.h>
@@ -89,7 +89,7 @@ size_t GetMillisecondCount()
     return now;
 }
 
-#elif defined NODECPP_LINUX
+#elif defined NODECPP_LINUX || defined(NODECPP_ANDROID)
 NODECPP_NOINLINE
 size_t GetMillisecondCount()
 {

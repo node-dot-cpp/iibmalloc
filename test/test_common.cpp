@@ -89,16 +89,21 @@ size_t GetMillisecondCount()
     return now;
 }
 
-#elif defined NODECPP_LINUX || defined(NODECPP_ANDROID)
+#elif defined(NODECPP_LINUX) || defined(NODECPP_ANDROID)
 NODECPP_NOINLINE
 size_t GetMillisecondCount()
 {
     size_t now;
 
-#if 1
+#if defined(NODECPP_LINUX)
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);//clock get time monotonic
     now = (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000; // mks
+
+#elif defined(NODECPP_ANDROID)
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	now = (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000; // ms
 #else
     struct timeval now_;
     gettimeofday(&now_, NULL);

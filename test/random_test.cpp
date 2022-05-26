@@ -262,7 +262,7 @@ void alignedAllocTest()
 	}
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		delete [] ptrs[i];
+		delete [] (char*)(ptrs[i]);
 	}
 
 	for ( size_t i=0; i<testCnt; ++i )
@@ -283,7 +283,7 @@ void alignedAllocTest()
 	}
 	for ( size_t i=0; i<testCnt; ++i )
 	{
-		delete [] ptrs[i];
+		delete [] (char*)(ptrs[i]);
 	}
 
 	for ( size_t i=0; i<testCnt; ++i )

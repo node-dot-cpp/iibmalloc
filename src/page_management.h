@@ -43,9 +43,6 @@
 #include "iibmalloc_common.h"
 #include <page_allocator.h>
 
-namespace nodecpp::iibmalloc
-{
-
 #define GET_PERF_DATA
 
 #if defined(GET_PERF_DATA) && !defined(SAFEMEMORY_CHECKER_EXTENSIONS) && (defined(NODECPP_X64) || defined(NODECPP_X86))
@@ -59,6 +56,9 @@ namespace nodecpp::iibmalloc
 inline uint64_t NODECPP_RDTSC() { return 0; }
 #endif // GET_PERF_DATA
 
+
+namespace nodecpp::iibmalloc
+{
 
 /* OS specific implementations */
 struct MemoryBlockListItem

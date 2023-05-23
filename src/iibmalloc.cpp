@@ -35,6 +35,15 @@
 #include <nodecpp_assert.h>
 #include "iibmalloc.h"
 
+#ifdef NODECPP_NOT_USING_IIBMALLOC
+
+namespace nodecpp::iibmalloc
+{
+	thread_local ThreadLocalAllocatorT* g_CurrentAllocManager = nullptr;
+} // namespace nodecpp::iibmalloc
+
+#else
+
 namespace nodecpp::iibmalloc
 {
 	std::atomic<uint16_t> SafeIibAllocator::allocatorIDBase;
@@ -265,3 +274,4 @@ void operator delete[]( void* ptr, std::size_t sz, std::align_val_t al ) noexcep
 //	//arenaEnd = reinterpret_cast<uint8_t*>(ptr) + tmp.getReservedSize();
 //}
 
+#endif // NODECPP_NOT_USING_IIBMALLOC

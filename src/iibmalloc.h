@@ -37,6 +37,12 @@
 #ifndef IIBMALLOC_H
 #define IIBMALLOC_H
 
+#if defined(___EMSCRIPTEN__)
+#define NODECPP_NOT_USING_IIBMALLOC
+#endif
+
+#ifndef NODECPP_NOT_USING_IIBMALLOC
+
 
 #include "iibmalloc_common.h"
 #include "page_management.h"
@@ -1583,5 +1589,21 @@ ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator );
 
 } // namespace nodecpp::iibmalloc
 
+#else
+
+namespace nodecpp::iibmalloc
+{
+struct ThreadlocalAllocator
+{
+	uint64_t allocatorID() { return 0; }
+};
+using ThreadLocalAllocatorT = ThreadlocalAllocator;
+extern thread_local ThreadLocalAllocatorT* g_CurrentAllocManager;
+inline
+ThreadLocalAllocatorT* setCurrneAllocator( ThreadLocalAllocatorT* allocator ) { return nullptr; }
+
+} // namespace nodecpp::iibmalloc
+
+#endif // NODECPP_NOT_USING_IIBMALLOC
 
 #endif // IIBMALLOC_H

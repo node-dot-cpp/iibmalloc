@@ -37,7 +37,7 @@
 #ifndef IIBMALLOC_H
 #define IIBMALLOC_H
 
-#if defined(___EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
 #define NODECPP_NOT_USING_IIBMALLOC
 #endif
 
